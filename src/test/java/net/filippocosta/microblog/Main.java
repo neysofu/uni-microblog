@@ -2,6 +2,8 @@ package net.filippocosta.microblog;
 
 public class Main {
     public static void main(String []args) {
-        TestUser.run();
+        System.out.println("-- MicroBlog: Batteria di test.");
+        System.out.println("");
+        TestUser.main(args);
     }
 }
