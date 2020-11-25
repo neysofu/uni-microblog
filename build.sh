@@ -1,0 +1,2 @@
+javac src/main/java/net/filippocosta/microblog/CheckRep.java src/main/java/net/filippocosta/microblog/Post.java src/main/java/net/filippocosta/microblog/User.java src/main/java/net/filippocosta/microblog/SocialNetwork.java -d classes
+jar cvf MicroBlog.jar classes/net/filippocosta/microblog/*
