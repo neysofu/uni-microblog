@@ -18,11 +18,11 @@ class SocialNetwork implements CheckRep {
      * RI: followees.forEach(user -> followees[user])
      */
     Map<String, Set<String>> followees;
-    Map<String, List<Post>> posts;
+    Map<String, Set<Post>> posts;
 
     public List<Post> getPosts() {
         List<Post> posts = new ArrayList<>();
-        for (Map.Entry<String, List<Post>> entry : this.posts.entrySet()) {
+        for (Map.Entry<String, List<Post>> entry : this.posts) {
             for (Post post : entry.getValue()) {
                 posts.add(post);
             }
@@ -56,15 +56,18 @@ class SocialNetwork implements CheckRep {
         return followers;
     }
 
-    /**
-     * Return a `List` of the top 10 users by follower count based on the
-     * `followers` data.
-     * 
-     * @param followers a `Map` of 'influencers'.
-     * @effects None.
-     * @throws NullPointerException if `isNull(followers)`.
-     * @return A `List` of 'influencers'.
-     */
+    // Restituisce una lista con tutti i nomi utente di `followers` che sono
+    // seguiti da più persone di quante non ne seguano.
+    //
+    // REQUIRES:
+    //   `followers != null`.
+    // THROWS:
+    //   `NullPointerException` se e solo se `followers == null`.
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce una lista di nomi utente estratta da `followers` che sono
+    //   seguiti da meno utenti di quanti non ne seguano.
     public static List<String> influencers(Map<String, Set<String>> followers) throws NullPointerException {
         List<String> influencers = new ArrayList<>();
         Map<String, Set<String>> followees = SocialNetwork.getFollowees(followers);
@@ -91,8 +94,16 @@ class SocialNetwork implements CheckRep {
         return followees;
     }
 
-    public Set<String> getMentionedUsers() {
-        return SocialNetwork.getMentionedUsers(this.getPosts());
+    public List<String> getMentionedUsers() {
+        return SocialNetwork.getMentionedUsers(this.getPosts()).toArray();
+    }
+
+    public Map<String, Set<String>> getFollowers() {
+
+    }
+
+    public Map<String, Set<String>> getFollowees() {
+        return this.followees;
     }
 
     public static Set<String> getMentionedUsers(List<Post> ps) {
@@ -115,11 +126,11 @@ class SocialNetwork implements CheckRep {
      *         `username`.
      */
     public List<Post> writtenBy(String username) {
-        return this.posts.get(username);
+        return new ArrayList<Post>(this.posts.get(username));
     }
 
     public static List<Post> writtenBy(List<Post> ps, String username) {
-        List<Post> posts = new ArrayList<>();
+        List<Post> posts = new ArrayList<Post>();
         for (Post post : ps) {
             if (post.author.equals(username)) {
                 posts.add(post);
@@ -161,14 +172,15 @@ class SocialNetwork implements CheckRep {
      * @param username
      * @modifies this
      */
-    public void createAccount(String username) {
+    public String register(String username) {
         if (this.userExists(username)) {
             // Duplicate usernames are not allowed!
             throw new IllegalArgumentException();
         }
         // Create (empty, for now) data associated with `username`.
         this.followees.put(username, new HashSet<String>());
-        this.posts.put(username, new ArrayList<Post>());
+        this.posts.put(username, new HashSet<Post>());
+        return username;
     }
 
     public boolean writePost(String username, Post post) {

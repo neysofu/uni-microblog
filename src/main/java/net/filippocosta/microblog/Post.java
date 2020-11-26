@@ -1,14 +1,12 @@
 package net.filippocosta.microblog;
 
 import java.time.Instant;
-import java.util.Set;
 import java.util.List;
-import java.util.Map;
 import java.util.Queue;
-import java.util.UUID;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 // Questa classe descrive e implementa le funzionalità dei post, che sono la
 // principale forma di contenuti su MicroBlog.
@@ -18,9 +16,7 @@ class Post implements CheckRep {
     // RI(p):
     //   RI_WEAK(p) && (p.parent != null ==> RI(p.parent))
     // RI_WEAK(p):
-    //   p.id != null
-    //
-    //   && p.author != null
+    //   p.author != null
     //   && User.usernameIsOk(p.author)
     //
     //   && p.text != null
@@ -49,163 +45,223 @@ class Post implements CheckRep {
     //
     //   && p.hashtags != null
     //   && (forall h. p.hashtags ==> h != null)
+    //   && (forall h. p.hashtags ==> p.text.contains(String.format("#%s", h)))
+    //
+    //   && p.taggedUsers != null
+    //   && (forall u. p.taggedUsers ==> u != null)
+    //   && (forall u. p.taggedUsers ==> p.text.contains(String.format("@%s", u)))
 
+    // Questo contatore permette di generate ID autoincrementate senza rischi di
+    // collisione.
+    private static int ID_COUNTER = 0;
+
+    // Lunghezza massima dei post su MicroBlog.
     public static int MAX_LENGTH = 140;
 
-    // Ogni post possiede un identificatore univoco (Universally Unique
-    // IDentifier) di grandezza 128-bit. Questi idenficatori vengono generati
-    // casualmente tramite `java.util.UUID.randomUUID()` senza rischio effettivo
-    // di collisione, considerata l'enorme entropia offerta da 128 bit di
-    // informazione.
-    UUID id;
+    // Attributi imposti dalla specifica:
+    private final int id;
+    private final String author;
+    private final String text;
+    private final Instant timestamp;
+    private List<String> likes;
+    // Attributi relativi alle funzionalità aggiuntive descritte nella relazione:
+    private final Post parent;
+    private List<Post> replies;
+    private final ReplyRestriction replyRestriction;
+    private final List<String> hashtags;
+    private final List<String> taggedUsers;
 
-    String author;
+    // Classe utile alla creazione di istanze `Post` tramite configurazione con
+    // i metodi `setReplyRestriction` e `inResponseTo`.
+    public class Builder {
+        // AF(c):
+        //   I dati necessari a istanziare un oggetto della classe `Post`.
+        // RI(c):
+        //   c.author != null && c.text != null
 
-    // Il corpo di test di questo post.
-    String text;
+        private final String author;
+        private final String text;
+        private Post parent;
+        private ReplyRestriction replyRestriction;
 
-    /**
-     * `Instant` is timezone-agnostic and has great precision, so it's a good choice
-     * for our intended usage.
-     * 
-     * RI: after `author`'s account creation date. AF: the time that the post got
-     * published.
-     */
-    Instant timestamp;
+        public Builder(String author, String text) {
+            this.author = author;
+            this.text = text;
+        }
 
-    /**
-     * According to the specification `like` is supposed to be:
-     * 
-     * lista degli utenti della rete sociale che hanno messo un like al post
-     * 
-     * So, intuitively, a `List<String>` would be the immediate choice. However,
-     * it's important to note that random-access operations on a `List` take linear
-     * time and we don't actually need to mantain an ordering of elements inside
-     * `likes`. By loosening the ordering requirement we open up the possibility of
-     * performance improvements: in fact, most `Set` implementations take constant
-     * amortized random-access time.
-     */
-    Set<String> likes;
+        // Configura i limiti imposti alle risposte del post.
+        //
+        // MODIFIES:
+        //   `this`.
+        // EFFECTS:
+        //   Restituisce `this` configurato a seconda di `restrict`.
+        public Builder setReplyRestriction(ReplyRestriction restrict) {
+            this.replyRestriction = restrict;
+            return this;
+        }
 
-    Post parent;
-    List<Post> replies;
+        // Stabilisce una relazione gerarchica -post e risposta al post-
+        // relativa al parametro `post`.
+        //
+        // MODIFIES:
+        //   `this`.
+        // EFFECTS:
+        //   Restituisce `this` configurato per istanziare una risposta a `post`.
+        public Builder inResponseTo(Post post) {
+            this.parent = post;
+            return this;
+        }
 
-    public enum ReplyRestriction {
-        ONLY_AUTHOR, ONLY_AUTHOR_OR_TAGGED_USERS, EVERYONE,
+        public Post build() {
+            return new Post(this);
+        }
     }
 
-    ReplyRestriction replyRestriction;
-    List<String> hashtags;
+    // L'autore di un post può limitare la possibilità degli altri utenti di
+    // rispondere al post stesso. Le configurazioni possibili sono tre:
+    //
+    // - Solo l'autore può rispondere al proprio post.
+    // - Solo l'autore del post o in alternativa gli utenti taggati nel post
+    //   possono rispondere.
+    // - Tutti possono rispondere al post.
+    public enum ReplyRestriction {
+        ONLY_AUTHOR,
+        ONLY_AUTHOR_OR_TAGGED_USERS,
+        EVERYONE,
+    }
 
     // Costruttore per la classe `Post`.
-    public Post(String author, String text, Post replyingTo, ReplyRestriction restrictions) {
-        this.id = UUID.randomUUID();
-        this.author = author;
-        this.text = text;
+    private Post(Builder builder) {
+        this.id = ID_COUNTER;
+        ID_COUNTER += 1;
+        this.author = builder.author;
+        this.text = builder.text;
         this.timestamp = Instant.now();
-        this.likes = new HashSet<>();
+        this.likes = new ArrayList<String>();
         if (text.length() > Post.MAX_LENGTH) {
             throw new IllegalArgumentException();
         }
-        this.parent = replyingTo;
+        this.parent = builder.parent;
         if (this.parent != null) {
             this.parent.replies.add(this);
         }
         this.replies = new ArrayList<Post>();
-        this.replyRestriction = restrictions;
-        this.hashtags = new ArrayList<String>();
+        this.replyRestriction = builder.replyRestriction;
+        this.hashtags = Post.parseHashtags(text);
+        this.taggedUsers = Post.parseTaggedUsers(text);
     }
 
+    // MODIFIES:
+    //   Nessuna modifica.
     // EFFECTS:
-    //   Restituisce il nome utente dell'autore di `this`.
+    //   Restituisce l'ID del post.
+    public int getId() {
+        return this.id;
+    }
+
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce il nome utente dell'autore del post.
     public String getAuthor() {
         return this.author;
     }
 
+    // MODIFIES:
+    //   Nessuna modifica.
     // EFFECTS:
-    //   Restituisce il corpo di testo di `this`.
+    //   Restituisce il corpo di testo del post.
     public String getText() {
         return this.text;
     }
 
-    /**
-     * @return a `List` of users that likes `this` post.
-     */
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce la data e l'ora di invio del post sotto forma di `Instant`.
+    public Instant getTimestamp() {
+        return this.timestamp;
+    }
+
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce la lista di nomi utente che hanno messo like al post.
     public List<String> getLikes() {
-        List<String> likes = new ArrayList<String>();
-        for (String like : this.likes) {
-            likes.add(like);
-        }
-        return likes;
+        return this.likes;
     }
 
-    // Esamina il contenuto del post `this` e restituisce la lista di utenti
-    // taggati nel testo.
-    //
-    // È possibile taggare un utente scrivendo il nome utente dello stesso,
-    // preceduto da una chiocciola. Per esempio:
-    //
-    //   > Oggi sono uscito a mangiare un gelato con @filippo_costa!
-    //   > Grazie a @danielerossi e @gianni99 per una serata fantastica :)
-    //
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
-    //   Restituisce la lista di utenti taggati in `this`.
+    //   Restituisce la lista di hashtag utilizzati nel post, in ordine di
+    //   presenza.
+    // EXAMPLES:
+    //   Gli hashtag sono parole o composizioni di parole precedute dal carattere
+    //   cancelletto. Per esempio:
+    //
+    //     > Tra poco ci sono gli esami! #paura #studio #programmazione2
+    public List<String> getHashtags() {
+        return this.hashtags;
+    }
+
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce la lista di nomi utente taggati nel post, in ordine di
+    //   presenza.
+    // EXAMPLES:
+    //   È possibile taggare un utente scrivendo il nome utente dello stesso,
+    //   preceduto dal carattere chiocciola. Per esempio:
+    //
+    //     > Oggi sono uscito a mangiare un gelato con @filippo_costa!
+    //     > Grazie a @danielerossi e @gianni99 per una serata fantastica :)
     public List<String> getTaggedUsers() {
-        List<String> taggedUsers = new ArrayList<>();
-        int tagStart = -1;
-        for (int i = 0; i < this.text.length(); i++) {
-            char c = this.text.charAt(i);
-            if (tagStart < 0 && c == '@') {
-                tagStart = i;
-            } else if (tagStart >= 0) {
-                tagStart = i;
-                taggedUsers.add(this.text.substring(tagStart, i + 1));
-            }
-        }
-        if (tagStart >= 0) {
-            taggedUsers.add(this.text.substring(tagStart, this.text.length()));
-        }
-        return taggedUsers;
+        return this.taggedUsers;
     }
 
-    // Controlla se l'utente `username` ha messo like al post `this`.
+    // Controlla se l'utente `username` ha messo like al post.
     //
+    // REQUIRES:
+    //   `username != null`.
+    // THROWS:
+    //   `NullPointerException` se e solo se `username == null`.
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
-    //   Restituisce `true` se e solo se `username` ha messo like a `this` o meno.
+    //   Restituisce `true` se e solo se `username` ha messo like al post, `false`
+    //   altrimenti.
     public boolean isLikedBy(String username) {
         return this.likes.contains(username);
     }
 
-    // Calcola se `this` è un post controverso. Un post è considerato
+    // Determina se il post è controverso o meno. Un post è considerato
     // controverso se il numero di risposte al post è strettamente maggiore del
     // numero di like al post stesso.
     //
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
-    //   Restituisce un valore booleano che determina se `this` è un post
-    //   controverso o meno.
+    //   Restituisce `true` se e solo se `this` è un post controverso, `false`
+    //   altrimenti.
     public boolean isControversial() {
         return this.totalReplies() > this.likes.size();
     }
 
-    // Calcola il numero totale di risposte e sotto-risposte (ad infinitum) a
-    // `this`.
+    // Calcola il numero totale di risposte e sotto-risposte (ad infinitum) al
+    // post.
     //
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
     //   Restituisce il numero di post che sono risposte -sia dirette che
     //   indirette- a `this`.
-    // EXAMPLE:
+    // EXAMPLES:
     //   Nel caso della conversazione riportata qui sotto, si avrebbe
-    //   `this.totalReplies() == 4`.
+    //   `this.totalReplies() == 4` (cinque post in totale, di cui uno è il post
+    //   originale).
     //
-    //   > Ciao a tutti! Come state oggi?
+    //   > Ciao a tutti! Come state oggi? #monday #helloeveryone
     //      > Ciao Maria! Così così... i lunerì mattina sono sempre terribili :(
     //      > Benissimoooo oggi ho la prima lezione del mio nuovo corso di ballo!
     //         > Ma dai! Il corso di danza latino-americana di cui mi parlavi al telefono?
@@ -226,7 +282,7 @@ class Post implements CheckRep {
         return size;
     }
 
-    // Aggiunge un like a `this` se non già presente da parte di `username`,
+    // Aggiunge un like al post se non già presente da parte di `username`,
     // altrimenti lo rimuove.
     //
     // REQUIRES:
@@ -237,12 +293,13 @@ class Post implements CheckRep {
     // MODIFIES:
     //   `this`.
     // EFFECTS:
-    //   Restituisce un valore booleano che rappresenta la presenza o meno del
-    //   like da parte di `username` al termine dell'esecuzione di questo metodo.
+    //   Restituisce `true` se e solo se `username` ha -al momento di uscita dal
+    //   metodo- messo like al post, `false` altrimenti.
     public boolean toggleLike(String username) throws NullPointerException, IllegalArgumentException {
         if (username == null) {
             throw new NullPointerException();
-        } else if (username == this.author) {
+        }
+        if (username == this.author) {
             throw new IllegalArgumentException("You can't like your own post.");
         }
         if (this.likes.contains(username)) {
@@ -254,27 +311,25 @@ class Post implements CheckRep {
         }
     }
 
-    /**
-     * Update the body of this post with some new text.
-     * 
-     * @param body the updated post's body.
-     * @modifies this
-     */
-    public void edit(String body) {
-        this.text = body;
-    }
-
-    // Verifica l'invariante di rappresentazione (IR) per l'instanza `this`.
+    // Verifica l'invariante di rappresentazione (RI) per l'instanza `this`.
+    //
+    // Nota bene: questo metodo è pensato unicamente per favorire il debugging e
+    // la realizzazione della batteria di test.
     //
     // MODIFIES:
-    // Nessuna modifica.
+    //   Nessuna modifica.
     // EFFECTS:
-    // Restituisce `true` se e solo se l'instanza `this` verifica l'invariante
-    // di rappresentazione della class `Post`, `false` altrimenti.
+    //   Restituisce `true` se e solo se il post verifica l'invariante di
+    //   rappresentazione della classe `Post`, `false` altrimenti.
     public boolean checkRep() {
-        boolean ri = this.author != null && User.usernameIsOk(this.author) && this.text != null
-                && this.text.length() <= Post.MAX_LENGTH && this.id != null && this.timestamp != null
-                && this.likes != null && !this.likes.contains(this.author) && this.replies != null;
+        boolean ri = this.author != null
+                  && User.usernameIsOk(this.author)
+                  && this.text != null
+                  && this.text.length() <= Post.MAX_LENGTH
+                  && this.timestamp != null
+                  && this.likes != null
+                  && !this.likes.contains(this.author)
+                  && this.replies != null;
         for (String like : this.likes) {
             ri = ri && (like != null) && User.usernameIsOk(like);
         }
@@ -290,5 +345,23 @@ class Post implements CheckRep {
             }
         }
         return ri;
+    }
+
+    private static List<String> parseHashtags(String text) {
+        List<String> hashtags = new ArrayList<>();
+        Matcher regex = Pattern.compile("#[a-zA-Z0-9_]+\b").matcher(text);
+        while (regex.find()) {
+            hashtags.add(regex.group());
+        }
+        return hashtags;
+    }
+
+    private static List<String> parseTaggedUsers(String text) {
+        List<String> taggedUsers = new ArrayList<>();
+        Matcher regex = Pattern.compile("@[a-zA-Z0-9_]+\b").matcher(text);
+        while (regex.find()) {
+            taggedUsers.add(regex.group());
+        }
+        return taggedUsers;
     }
 }

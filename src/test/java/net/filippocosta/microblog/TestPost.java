@@ -1,7 +1,13 @@
 package net.filippocosta.microblog;
 
-public class TestPost {
+import java.util.List;
 
-    public static void main(String[] args) {
+public class TestPost {
+    static String userAlice = "Alice";
+    static String userBob = "super_bob99";
+    static String userCharlie = "Charlie";
+
+    public static void run() {
+        Post postFoo = new Post(author, text, replyingTo, restrictions)
     }
 }

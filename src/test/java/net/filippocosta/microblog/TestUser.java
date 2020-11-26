@@ -33,7 +33,7 @@ public class TestUser {
         }
     }
 
-    public static void main(String[] args) {
+    public static void run() {
         UnitTest.runAndPrint("TestUser.testUsernameMinLength", TestUser.testUsernameMinLength());
         UnitTest.runAndPrint("TestUser.testUsernameMaxLength", TestUser.testUsernameMaxLength());
         UnitTest.runAndPrint("TestUser.testOkUsernames", TestUser.testOkUsernames());
