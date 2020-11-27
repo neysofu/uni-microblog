@@ -1,7 +1,6 @@
 package net.filippocosta.microblog;
 
 import net.filippocosta.microblog.Post.ReplyRestriction;
-import net.filippocosta.microblog.exceptions.PostRestrictedReplyException;
 
 public class TestPost {
     static String userAlice = "Alice";
@@ -115,6 +114,24 @@ public class TestPost {
         return success;
     }
 
+    public static boolean testLikes() {
+        Post post = new Post.Builder(userAlice, "Ciao!").build();
+        boolean success = post.getLikes().size() == 0;
+        try {
+            post.toggleLike(null);
+            return false;
+        } catch (NullPointerException e) {}
+        try {
+            post.toggleLike(post.getAuthor());
+            return false;
+        } catch (IllegalArgumentException e) {}
+        success = success && post.getLikes().size() == 0;
+        post.toggleLike(userCharlie);
+        success = success && post.getLikes().size() == 1;
+        post.toggleLike(userBob);
+        return success && post.getLikes().size() == 2;
+    }
+
     public static void run() {
         UnitTest.runAndPrint("TestPost.testDefaultReplyRestriction", TestPost.testDefaultReplyRestriction());
         UnitTest.runAndPrint("TestPost.testSetReplyRestiction", TestPost.testSetReplyRestriction());
@@ -124,5 +141,6 @@ public class TestPost {
         UnitTest.runAndPrint("TestPost.testHashtags", TestPost.testHashtags());
         UnitTest.runAndPrint("TestPost.testTaggedUsers", TestPost.testTaggedUsers());
         UnitTest.runAndPrint("TestPost.testConversation", TestPost.testConversation());
+        UnitTest.runAndPrint("TestPost.testLikes", TestPost.testLikes());
     }
 }
