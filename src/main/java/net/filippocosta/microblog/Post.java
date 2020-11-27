@@ -14,8 +14,6 @@ class Post implements CheckRep {
     // AF(p):
     //   <id, author, text, timestamp, likes, privacy>
     // RI(p):
-    //   RI_WEAK(p) && (p.parent != null ==> RI(p.parent))
-    // RI_WEAK(p):
     //   p.author != null
     //   && User.usernameIsOk(p.author)
     //
@@ -30,15 +28,15 @@ class Post implements CheckRep {
     //
     //   && p.replies != null
     //   && (forall p1. p.replies ==> p1 != null
-    //   && RI_WEAK(p1)
-    //   && p1.timestamp.after(p.timestamp)
-    //   && p1.parent == p)
+    //                             && RI(p1)
+    //                             && p1.timestamp.after(p.timestamp)
+    //                             && p1.parent == p)
     //
     //   && p.replyRestriction != null
-    //   && ((p.replyRestriction == ReplyRestriction.ONLY_AUTHOR)
+    //   && ((p.replyRestriction == ONLY_AUTHOR)
     //       ==>
     //       (forall p1. p.replies ==> p1.author == p.author))
-    //   && ((p.replyRestriction == ReplyRestriction.ONLY_IF_TAGGED)
+    //   && ((p.replyRestriction == ONLY_AUTHOR_OR_TAGGED_USERS)
     //       ==>
     //       (forall p1. p.replies ==> (p1.author == p.author) ||
     //        p.getTaggedUsers().contains(p1.author)))
@@ -73,7 +71,7 @@ class Post implements CheckRep {
 
     // Classe utile alla creazione di istanze `Post` tramite configurazione con
     // i metodi `setReplyRestriction` e `inResponseTo`.
-    public class Builder {
+    public static class Builder {
         // AF(c):
         //   I dati necessari a istanziare un oggetto della classe `Post`.
         // RI(c):
@@ -82,7 +80,7 @@ class Post implements CheckRep {
         private final String author;
         private final String text;
         private Post parent;
-        private ReplyRestriction replyRestriction;
+        private ReplyRestriction replyRestriction = ReplyRestriction.EVERYONE;
 
         public Builder(String author, String text) {
             this.author = author;
@@ -91,11 +89,18 @@ class Post implements CheckRep {
 
         // Configura i limiti imposti alle risposte del post.
         //
+        // REQUIRES:
+        //   `restrict != null`.
+        // THROWS:
+        //   `NullPointerException` se e solo se `restrict == null`.
         // MODIFIES:
         //   `this`.
         // EFFECTS:
         //   Restituisce `this` configurato a seconda di `restrict`.
-        public Builder setReplyRestriction(ReplyRestriction restrict) {
+        public Builder setReplyRestriction(ReplyRestriction restrict) throws NullPointerException {
+            if (restrict == null) {
+                throw new NullPointerException();
+            }
             this.replyRestriction = restrict;
             return this;
         }
@@ -103,11 +108,21 @@ class Post implements CheckRep {
         // Stabilisce una relazione gerarchica -post e risposta al post-
         // relativa al parametro `post`.
         //
+        // REQUIRES:
+        //   `post != null && post.userCanReply(author)`.
+        // THROWS:
+        //   `NullPointerException` se e solo se `post == null`.
+        //   `IllegalArgumentException` se e solo se `!post.userCanReply(author)`.
         // MODIFIES:
         //   `this`.
         // EFFECTS:
         //   Restituisce `this` configurato per istanziare una risposta a `post`.
-        public Builder inResponseTo(Post post) {
+        public Builder inResponseTo(Post post) throws NullPointerException, IllegalArgumentException {
+            if (post == null) {
+                throw new NullPointerException();
+            } else if (!post.userCanReply(this.author)) {
+                throw new IllegalArgumentException();
+            }
             this.parent = post;
             return this;
         }
@@ -131,24 +146,27 @@ class Post implements CheckRep {
     }
 
     // Costruttore per la classe `Post`.
-    private Post(Builder builder) {
-        this.id = ID_COUNTER;
-        ID_COUNTER += 1;
-        this.author = builder.author;
-        this.text = builder.text;
-        this.timestamp = Instant.now();
-        this.likes = new ArrayList<String>();
-        if (text.length() > Post.MAX_LENGTH) {
+    private Post(Builder builder) throws NullPointerException, IllegalArgumentException {
+        if (builder.author == null || builder.text == null) {
+            throw new NullPointerException();
+        }
+        if (builder.text.length() > Post.MAX_LENGTH) {
             throw new IllegalArgumentException();
         }
+        this.id = ID_COUNTER;
+        this.author = builder.author;
+        this.text = builder.text;
+        this.replyRestriction = builder.replyRestriction;
+        this.timestamp = Instant.now();
+        this.likes = new ArrayList<String>();
+        this.replies = new ArrayList<Post>();
+        this.hashtags = Post.parseHashtags(text);
+        this.taggedUsers = Post.parseTaggedUsers(text);
         this.parent = builder.parent;
         if (this.parent != null) {
             this.parent.replies.add(this);
         }
-        this.replies = new ArrayList<Post>();
-        this.replyRestriction = builder.replyRestriction;
-        this.hashtags = Post.parseHashtags(text);
-        this.taggedUsers = Post.parseTaggedUsers(text);
+        ID_COUNTER += 1;
     }
 
     // MODIFIES:
@@ -191,6 +209,32 @@ class Post implements CheckRep {
         return this.likes;
     }
 
+
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce il tipo di configurazione per le risposte del post.
+    public ReplyRestriction getReplyRestriction() {
+        return this.replyRestriction;
+    }
+
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce il post a cui risponde questo post (se esiste), `null`
+    //   altrimenti.
+    public Post getParent() {
+        return this.parent;
+    }
+
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce una lista delle risposte dirette al post.
+    public List<Post> getReplies() {
+        return this.replies;
+    }
+
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
@@ -218,6 +262,20 @@ class Post implements CheckRep {
     //     > Grazie a @danielerossi e @gianni99 per una serata fantastica :)
     public List<String> getTaggedUsers() {
         return this.taggedUsers;
+    }
+
+    public boolean userCanReply(String user) {
+        switch(this.getReplyRestriction()) {
+            case EVERYONE:
+                return true;
+            case ONLY_AUTHOR_OR_TAGGED_USERS:
+                return this.author == user
+                    || this.getTaggedUsers().contains(user);
+            case ONLY_AUTHOR:
+                return this.author == user;
+            default:
+                return false;
+        }
     }
 
     // Controlla se l'utente `username` ha messo like al post.
@@ -273,13 +331,13 @@ class Post implements CheckRep {
         while (!queue.isEmpty()) {
             Post top = queue.poll();
             if (top != null) {
-                for (Post reply : top.replies) {
+                for (Post reply : top.getReplies()) {
                     queue.add(reply);
                 }
                 size++;
             }
         }
-        return size;
+        return size - 1;
     }
 
     // Aggiunge un like al post se non già presente da parte di `username`,
@@ -349,18 +407,20 @@ class Post implements CheckRep {
 
     private static List<String> parseHashtags(String text) {
         List<String> hashtags = new ArrayList<>();
-        Matcher regex = Pattern.compile("#[a-zA-Z0-9_]+\b").matcher(text);
+        Matcher regex = Pattern.compile("#[a-zA-Z0-9_]+").matcher(text);
         while (regex.find()) {
-            hashtags.add(regex.group());
+            // `.substring(1)` per rimuovere il carattere cancelletto.
+            hashtags.add(regex.group().substring(1));
         }
         return hashtags;
     }
 
     private static List<String> parseTaggedUsers(String text) {
         List<String> taggedUsers = new ArrayList<>();
-        Matcher regex = Pattern.compile("@[a-zA-Z0-9_]+\b").matcher(text);
+        Matcher regex = Pattern.compile("@[a-zA-Z0-9_]+").matcher(text);
         while (regex.find()) {
-            taggedUsers.add(regex.group());
+            // `.substring(1)` per rimuovere il carattere chiocciola.
+            taggedUsers.add(regex.group().substring(1));
         }
         return taggedUsers;
     }

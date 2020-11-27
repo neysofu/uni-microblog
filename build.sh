@@ -1,1 +1,1 @@
-javac -d bin src/*/java/net/filippocosta/microblog/*
+javac -d . ../src/*/java/net/filippocosta/microblog/*

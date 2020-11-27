@@ -22,10 +22,10 @@ import java.util.ArrayList;
 //   - Lettere.
 //   - Numeri.
 //   - Trattino basso (l'undescore, ASCII 95).
-// 
-// Questa classe non contiene alcuno stato interno e nessun costruttore. Ciò
-// rende superfluo la descrizione di AF e RI.
 final public class User {
+    // Questa classe non contiene alcuno stato interno e nessun costruttore. Ciò
+    // rende superfluo la descrizione di AF e RI.
+
     public static int USERNAME_MIN_LENGTH = 3;
     public static int USERNAME_MAX_LENGTH = 12;
 

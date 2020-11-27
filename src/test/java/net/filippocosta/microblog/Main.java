@@ -5,6 +5,7 @@ public class Main {
         System.out.println("-- MicroBlog: Batteria di test.");
         System.out.println("");
         TestUser.run();
+        System.out.println("");
         TestPost.run();
     }
 }

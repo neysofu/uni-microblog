@@ -22,12 +22,16 @@ class SocialNetwork implements CheckRep {
 
     public List<Post> getPosts() {
         List<Post> posts = new ArrayList<>();
-        for (Map.Entry<String, List<Post>> entry : this.posts) {
+        for (Map.Entry<String, Set<Post>> entry : this.posts.entrySet()) {
             for (Post post : entry.getValue()) {
                 posts.add(post);
             }
         }
         return posts;
+    }
+
+    public List<String> getUsers() {
+        return new ArrayList<String>(this.followees.keySet());
     }
 
     /**
@@ -43,14 +47,14 @@ class SocialNetwork implements CheckRep {
     public static Map<String, Set<String>> guessFollowers(List<Post> ps) throws NullPointerException {
         Map<String, Set<String>> followers = new HashMap<>();
         for (Post post : ps) {
-            if (!followers.containsKey(post.author)) {
-                followers.put(post.author, new HashSet<String>());
+            if (!followers.containsKey(post.getAuthor())) {
+                followers.put(post.getAuthor(), new HashSet<String>());
             }
-            for (String userWhoLiked : post.likes) {
+            for (String userWhoLiked : post.getLikes()) {
                 if (!followers.containsKey(userWhoLiked)) {
                     followers.put(userWhoLiked, new HashSet<String>());
                 }
-                followers.get(post.author).add(userWhoLiked);
+                followers.get(post.getAuthor()).add(userWhoLiked);
             }
         }
         return followers;
@@ -95,11 +99,11 @@ class SocialNetwork implements CheckRep {
     }
 
     public List<String> getMentionedUsers() {
-        return SocialNetwork.getMentionedUsers(this.getPosts()).toArray();
+        return new ArrayList<String>(SocialNetwork.getMentionedUsers(this.getPosts()));
     }
 
     public Map<String, Set<String>> getFollowers() {
-
+        return this.followees;
     }
 
     public Map<String, Set<String>> getFollowees() {
@@ -109,7 +113,7 @@ class SocialNetwork implements CheckRep {
     public static Set<String> getMentionedUsers(List<Post> ps) {
         Set<String> mentionedUsers = new HashSet<>();
         for (Post post : ps) {
-            mentionedUsers.add(post.author);
+            mentionedUsers.add(post.getAuthor());
             for (String taggedUser : post.getTaggedUsers()) {
                 mentionedUsers.add(taggedUser);
             }
@@ -132,7 +136,7 @@ class SocialNetwork implements CheckRep {
     public static List<Post> writtenBy(List<Post> ps, String username) {
         List<Post> posts = new ArrayList<Post>();
         for (Post post : ps) {
-            if (post.author.equals(username)) {
+            if (post.getAuthor().equals(username)) {
                 posts.add(post);
             }
         }
@@ -149,7 +153,7 @@ class SocialNetwork implements CheckRep {
         List<Post> results = new ArrayList<>();
         for (Post post : this.getPosts()) {
             for (String word : words) {
-                if (post.text.contains(word)) {
+                if (post.getText().contains(word)) {
                     results.add(post);
                 }
             }
@@ -167,11 +171,6 @@ class SocialNetwork implements CheckRep {
         return this.followees.containsKey(username);
     }
 
-    /**
-     * 
-     * @param username
-     * @modifies this
-     */
     public String register(String username) {
         if (this.userExists(username)) {
             // Duplicate usernames are not allowed!
@@ -192,6 +191,16 @@ class SocialNetwork implements CheckRep {
         return true;
     }
     
+    // Verifica l'invariante di rappresentazione (RI) per l'instanza `this`.
+    //
+    // Nota bene: questo metodo è pensato unicamente per favorire il debugging e
+    // la realizzazione della batteria di test.
+    //
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce `true` se e solo se il post verifica l'invariante di
+    //   rappresentazione della classe `SocialNetwork`, `false` altrimenti.
     public boolean checkRep() {
         for (Post ps : this.getPosts()) {
             if (!ps.checkRep()) {
