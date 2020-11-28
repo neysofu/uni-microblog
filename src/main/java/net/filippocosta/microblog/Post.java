@@ -20,11 +20,11 @@ import java.util.regex.Pattern;
 //     4. Data e ora di pubblicazione del post.
 //     5. L'insieme di nomi utenti che hanno messo "mi piace" (like) al post:
 //        `{ likes_0, likes_1, ... likes_n }`. Si ha inoltre che
-//        `forall l1, l2. likes ==> l1 != l2`.
+//        `forall l1, l2 ∈ likes ==> l1 != l2`.
 //     6. Il post a cui questo post risponde (opzionale).
 //     7. L'insieme di risposte a questo post:
 //        `{ replies_0, replies_1, ... replies_m }`. Si ha inoltre che
-//        `forall r1, r2. r1, r2 ∈ replies ==> r1.getId() != r2.getId()`.
+//        `forall r1, r2 ∈ replies ==> r1.getId() != r2.getId()`.
 //     8. Un'impostazione che determina chi può rispondere a questo post su
 //        MicroBlog tale per cui `replyRestriction ∈ S`, dove S è il tipo di dato
 //        astratto della classe `ReplyRestriction`.
@@ -49,30 +49,32 @@ class Post implements CheckRep {
     //
     //   && p.likes != null
     //   && !p.likes.contains(p.author)
-    //   && (forall u. p.likes ==> u != null && User.usernameIsOk(u))
+    //   && (forall i | 0 <= i < p.likes.size() ==> p.likes.get(i) != null && User.usernameIsOk(u))
     //
     //   && p.replies != null
-    //   && (forall p1. p.replies ==> p1 != null
-    //                             && RI(p1)
-    //                             && p1.timestamp.after(p.timestamp)
-    //                             && p1.parent == p)
+    //   && (forall i | 0 <= i < p.replies.size() ==> p.replies.get(i) != null
+    //                                             && RI(p.replies.get(i))
+    //                                             && p.replies.get(i).timestamp.after(p.timestamp)
+    //                                             && p.replies.get(i).parent == p)
     //
     //   && p.replyRestriction != null
     //   && ((p.replyRestriction == ONLY_AUTHOR)
     //       ==>
-    //       (forall p1. p.replies ==> p1.author == p.author))
+    //       (forall i | 0 <= i < p.replies.size() ==> p.replies.get(i) == p.author))
     //   && ((p.replyRestriction == ONLY_AUTHOR_OR_TAGGED_USERS)
     //       ==>
-    //       (forall p1. p.replies ==> (p1.author == p.author) ||
-    //        p.getTaggedUsers().contains(p1.author)))
+    //       (forall i | 0 <= i < p.replies.size() ==> p.replies.get(i) == p.author)
+    //        || p.getTaggedUsers().contains(p.replies.get(i).author)))
     //
     //   && p.hashtags != null
-    //   && (forall h. p.hashtags ==> h != null)
-    //   && (forall h. p.hashtags ==> p.text.contains(String.format("#%s", h)))
+    //   && (forall i | 0 <= i < p.hashtags.size()
+    //       ==> p.hashtags.get(i) != null
+    //        && p.text.contains(String.format("#%s", p.hashtags.get(i)))
     //
     //   && p.taggedUsers != null
-    //   && (forall u. p.taggedUsers ==> u != null)
-    //   && (forall u. p.taggedUsers ==> p.text.contains(String.format("@%s", u)))
+    //   && (forall i | 0 <= i < p.taggedUsers.size()
+    //       ==> p.taggedUsers.get(i) != null
+    //        && p.text.contains(String.format("@%s", p.taggedUsers.get(i)))
 
     // Questo contatore permette di generare ID autoincrementate senza rischi di
     // collisione.
