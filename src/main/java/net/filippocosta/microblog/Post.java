@@ -8,11 +8,36 @@ import java.util.LinkedList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-// Questa classe descrive e implementa le funzionalità dei post, che sono la
-// principale forma di contenuti su MicroBlog.
+// OVERVIEW:
+//   Questa classe descrive e implementa le funzionalità dei post, che sono la
+//   principale forma di contenuti su MicroBlog. Il tipo di dato astratto
+//   associato è composto dalle seguenti informazioni:
+//     <id, author, text, timestamp, likes, parent, replies, replyRestriction>
+//   Queste informazioni rappresentano rispettivamente:
+//     1. L'identificativo numerico unico associato al post.
+//     2. Il nome utente dell'autore del post.
+//     3. Il corpo di testo -limitato a 140 caratteri- del post.
+//     4. Data e ora di pubblicazione del post.
+//     5. L'insieme di nomi utenti che hanno messo "mi piace" (like) al post:
+//        `{ likes_0, likes_1, ... likes_n }`. Si ha inoltre che
+//        `forall l1, l2. likes ==> l1 != l2`.
+//     6. Il post a cui questo post risponde (opzionale).
+//     7. L'insieme di risposte a questo post:
+//        `{ reply_0, reply_1, ... reply_m }`. Si ha inoltre che
+//        `forall r1, r2. replies ==> r1.id != r2.id`.
+//     8. Un'impostazione che determina chi può rispondere a questo post su
+//        MicroBlog tale per cui `replyRestriction in S`, dove S è il tipo di dato
+//        astratto della classe `ReplyRestriction`.
 class Post implements CheckRep {
     // AF(p):
-    //   <id, author, text, timestamp, likes, privacy>
+    //   <p.id,
+    //    p.author,
+    //    p.text,
+    //    p.timestamp,
+    //    {p.likes.get(i) | 0 <= i <= n},
+    //    p.parent,
+    //    {p.replies.get(i) | 0 <= i <= m},
+    //    p.replyRestriction>
     // RI(p):
     //   p.author != null
     //   && User.usernameIsOk(p.author)
@@ -49,40 +74,79 @@ class Post implements CheckRep {
     //   && (forall u. p.taggedUsers ==> u != null)
     //   && (forall u. p.taggedUsers ==> p.text.contains(String.format("@%s", u)))
 
-    // Questo contatore permette di generate ID autoincrementate senza rischi di
+    // Questo contatore permette di generare ID autoincrementate senza rischi di
     // collisione.
     private static int ID_COUNTER = 0;
 
     // Lunghezza massima dei post su MicroBlog.
     public static int MAX_LENGTH = 140;
 
-    // Attributi imposti dalla specifica:
+    // Attributi imposti dalla specifica del progetto:
     private final int id;
     private final String author;
     private final String text;
     private final Instant timestamp;
     private List<String> likes;
-    // Attributi relativi alle funzionalità aggiuntive descritte nella relazione:
+    // Attributi relativi alle funzionalità aggiuntive (descritte nella relazione):
     private final Post parent;
     private List<Post> replies;
     private final ReplyRestriction replyRestriction;
     private final List<String> hashtags;
     private final List<String> taggedUsers;
 
-    // Classe utile alla creazione di istanze `Post` tramite configurazione con
-    // i metodi `setReplyRestriction` e `inResponseTo`.
+    // OVERVIEW:
+    //   Un `Builder` è un oggetto modificabile utile alla creazione di istanze
+    //   `Post` tramite configurazione. Il tipo di dato astratto associato è
+    //   composto dalle quattro informazioni fondamentali alla pubblicazione di un
+    //   post:
+    //     <author, text, parent, replyRestriction>
+    //   Queste quattro informazioni rappresentano rispettivamente:
+    //     1. Il nome utente dell'autore del post da pubblicare.
+    //     2. Il corpo di testo del post da pubblicare.
+    //     3. Il post a cui si intende rispondere pubblicando questo post
+    //        (opzionale).
+    //     4. Impostazioni relative alle risposte del post che si intende
+    //        pubblicare.
     public static class Builder {
         // AF(c):
-        //   I dati necessari a istanziare un oggetto della classe `Post`.
+        //   La rappresentazione concreta `c` rappresenta la schematica di
+        //   pubblicazione di un post:
+        //     1. Da parte di `c.author`.
+        //     2. Che abbia come corpo di testo `c.text`.
+        //     3. Che risponda a `c.parent` se e solo se `c.parent != null`,
+        //        altrimenti che non risponda a nessuno.
+        //     4. Che sia configurato come previsto da `c.replyRestriction`.
         // RI(c):
-        //   c.author != null && c.text != null
+        //   c.author != null
+        //   && c.text != null
+        //   && c.replyRestriction != null
 
         private final String author;
         private final String text;
         private Post parent;
         private ReplyRestriction replyRestriction = ReplyRestriction.EVERYONE;
 
-        public Builder(String author, String text) {
+        // REQUIRES:
+        //   `author != null && text != null && text.length() <= 140`.
+        // THROWS:
+        //   `NullPointerException` se e solo se `author == null || text == null`.
+        //   `IllegalArgumentException` se e solo se il corpo di testo del post
+        //   supera la lunghezza massima.
+        // EFFECTS:
+        //   Restituisce un costruttore
+        //     <author, text, parent, replyRestriction>
+        //   tale per cui:
+        //     - `author` è inalterato.
+        //     - `text` è inalterato.
+        //     - `parent` è inizialmente assente, settabile con il metodo
+        //       `inResponseTo`.
+        //     - `replyRestriction` ha inizialmente il valore di default `EVERYONE`.
+        public Builder(String author, String text) throws NullPointerException, IllegalArgumentException {
+            if (author == null || text == null) {
+                throw new NullPointerException();
+            } else if (text.length() > Post.MAX_LENGTH) {
+                throw new IllegalArgumentException();
+            }
             this.author = author;
             this.text = text;
         }
@@ -96,7 +160,14 @@ class Post implements CheckRep {
         // MODIFIES:
         //   `this`.
         // EFFECTS:
-        //   Restituisce `this` configurato a seconda di `restrict`.
+        //   Modifica il costruttore preselezionando il settaggio di limite alle
+        //   risposte del post secondo `restrict`. Dopo aver modificato il
+        //   costruttore, lo restituisce. Formalmente si ha che
+        //     this_pre := <author, text, parent, replyRestriction_old>
+        //   e dopo
+        //     this_post := <author, text, parent, replyRestriction_new>
+        //   tale per cui:
+        //   - `replyRestriction_new` è inalterato rispetto al parametro `restrict`.
         public Builder setReplyRestriction(ReplyRestriction restrict) throws NullPointerException {
             if (restrict == null) {
                 throw new NullPointerException();
@@ -105,9 +176,6 @@ class Post implements CheckRep {
             return this;
         }
 
-        // Stabilisce una relazione gerarchica -post e risposta al post-
-        // relativa al parametro `post`.
-        //
         // REQUIRES:
         //   `post != null && post.userCanReply(author)`.
         // THROWS:
@@ -116,7 +184,15 @@ class Post implements CheckRep {
         // MODIFIES:
         //   `this`.
         // EFFECTS:
-        //   Restituisce `this` configurato per istanziare una risposta a `post`.
+        //   Modifica il costruttore stabilendo una relazione gerarchica tra
+        //   `post` e `this`, tale per cui `this` è una risposta a `post`.
+        //   Dopo aver modificato il costruttore lo restituisce. Formalmente si ha
+        //   che
+        //     this_pre := <author, text, parent_old, replyRestriction>
+        //   e dopo
+        //     this_post := <author, text, parent_new, replyRestriction>
+        //   tale per cui:
+        //     - `parent_new` è inalterato rispetto al parametro `post`.
         public Builder inResponseTo(Post post) throws NullPointerException, IllegalArgumentException {
             if (post == null) {
                 throw new NullPointerException();
@@ -127,32 +203,50 @@ class Post implements CheckRep {
             return this;
         }
 
+        // EFFECTS:
+        //   Restituisce una nuova istanza di `Post`. Se
+        //     this_pre := <author, text, parent, replyRestriction>
+        //   allora il valore restituito sarà
+        //     <id, author, text, timestamp, likes, parent, replies, replyRestriction>
+        //   tale per cui:
+        //     - `id` è generata automaticamente in modo incrementale, perciò unica.
+        //     - `author` è inalterato.
+        //     - `text` è inalterato.
+        //     - `timestamp` è calcolato in tempo reale utilizzando la libreria
+        //       standard.
+        //     - `likes` è inizialmente vuoto.
+        //     - `parent` è inalterato.
+        //     - `replies` è inizialmente vuoto.
+        //     - `replyRestriction` è inalterato.
         public Post build() {
             return new Post(this);
         }
     }
 
-    // L'autore di un post può limitare la possibilità degli altri utenti di
-    // rispondere al post stesso. Le configurazioni possibili sono tre:
+    // OVERVIEW:
+    //   L'autore di un post può limitare la possibilità degli altri utenti di
+    //   rispondere al post stesso. Le configurazioni possibili sono tre:
     //
-    // - Solo l'autore può rispondere al proprio post.
-    // - Solo l'autore del post o in alternativa gli utenti taggati nel post
-    //   possono rispondere.
-    // - Tutti possono rispondere al post.
+    //     - Solo l'autore può rispondere al proprio post.
+    //     - Solo l'autore del post o in alternativa gli utenti taggati nel post
+    //       possono rispondere.
+    //     - Tutti possono rispondere al post.
+    //
+    //   Il tipo di dato astratto associato è l'insieme di cardinalità #3 che
+    //   comprende queste tre opzioni.
     public enum ReplyRestriction {
+        // AF(rr):
+        //   Non necessaria perchè tipo di dato concreto e astratto coincidono.
+        // RI(rr):
+        //   true
+
         ONLY_AUTHOR,
         ONLY_AUTHOR_OR_TAGGED_USERS,
         EVERYONE,
     }
 
     // Costruttore per la classe `Post`.
-    private Post(Builder builder) throws NullPointerException, IllegalArgumentException {
-        if (builder.author == null || builder.text == null) {
-            throw new NullPointerException();
-        }
-        if (builder.text.length() > Post.MAX_LENGTH) {
-            throw new IllegalArgumentException();
-        }
+    private Post(Builder builder) {
         this.id = ID_COUNTER;
         this.author = builder.author;
         this.text = builder.text;
@@ -196,7 +290,7 @@ class Post implements CheckRep {
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
-    //   Restituisce la data e l'ora di invio del post sotto forma di `Instant`.
+    //   Restituisce la data e l'ora di invio del post.
     public Instant getTimestamp() {
         return this.timestamp;
     }
@@ -264,6 +358,15 @@ class Post implements CheckRep {
         return this.taggedUsers;
     }
 
+    // REQUIRES:
+    //   `user != null`.
+    // THROWS:
+    //   `NullPointerException` se e solo se `user == null`.
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce `true` se e solo se `user` è autorizzato a postare una
+    //   risposta a `this`, `false` altrimenti.
     public boolean userCanReply(String user) {
         switch(this.getReplyRestriction()) {
             case EVERYONE:
@@ -278,8 +381,6 @@ class Post implements CheckRep {
         }
     }
 
-    // Controlla se l'utente `username` ha messo like al post.
-    //
     // REQUIRES:
     //   `username != null`.
     // THROWS:
@@ -367,6 +468,26 @@ class Post implements CheckRep {
             this.likes.add(username);
             return true;
         }
+    }
+
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce una cosiddetta "deep copy" di `this`.
+    public Post deepCopy() {
+        Post.Builder builder = new Post.Builder(this.getAuthor(), this.getText())
+            .setReplyRestriction(this.getReplyRestriction());
+        if (this.getParent() != null) {
+            builder = builder.inResponseTo(this.getParent());
+        }
+        Post copy = builder.build();
+        for (String like : this.getLikes()) {
+            copy.toggleLike(like);
+        }
+        for (Post reply : this.getReplies()) {
+            reply.deepCopy();
+        }
+        return copy;
     }
 
     // Verifica l'invariante di rappresentazione (RI) per l'instanza `this`.

@@ -7,5 +7,7 @@ public class Main {
         TestUser.run();
         System.out.println("");
         TestPost.run();
+        System.out.println("");
+        TestSocialNetwork.run();
     }
 }
