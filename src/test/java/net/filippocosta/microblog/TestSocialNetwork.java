@@ -28,9 +28,65 @@ public class TestSocialNetwork {
         return true;
     }
 
+    public static boolean testGetters() {
+        SocialNetwork microblog = socialNetworkWithUsers();
+        Post p1 = microblog.writePost(new Post.Builder(userAlice, "Salve #PopoloDiStriscia"));
+        Post p2 = microblog.writePost(new Post.Builder(userAlice, "Buonasera!"));
+        boolean success = microblog.getPosts().size() == 2
+                       && microblog.getUsers().size() == 3
+                       && microblog.getFollowers().size() == 3
+                       && microblog.getFollowers().get(userAlice).size() == 0
+                       && microblog.getFollowers().get(userBob).size() == 0;
+        System.out.println(success);
+        microblog.like(p2, userBob);
+        success = success
+               && microblog.getFollowees().get(userBob).size() == 0
+               && microblog.getFollowers().get(userAlice).size() == 0;
+        System.out.println(success);
+        microblog.like(p1, userBob);
+        System.out.println(microblog.getFollowees());
+        System.out.println(microblog.getFollowers());
+        success = success
+               && microblog.getFollowees().get(userAlice).size() == 0
+               && microblog.getFollowers().get(userAlice).size() == 1
+               && microblog.getFollowees().get(userBob).size() == 1
+               && microblog.getFollowees().get(userBob).contains(userAlice)
+               && microblog.getFollowers().get(userBob).size() == 1;
+        System.out.println(success);
+        microblog.dislike(p2, userBob);
+        success = success
+               && microblog.getFollowers().get(userAlice).size() == 1;
+        System.out.println(success);
+        microblog.dislike(p1, userBob);
+        success = success
+               && microblog.getFollowers().get(userAlice).size() == 0
+               && microblog.getFollowees().get(userBob).size() == 0
+               && microblog.getFollowers().get(userBob).size() == 0;
+        System.out.println(success);
+        return success;
+    }
+
+    public static boolean testGuessFollowers() {
+        SocialNetwork microblog = socialNetworkWithUsers();
+        Post p1 = microblog.writePost(new Post.Builder(userAlice, "Ciao"));
+        Post p2 = microblog.writePost(new Post.Builder(userAlice, "Buonasera"));
+        Post p3 = microblog.writePost(new Post.Builder(userCharlie, "Ciao Alice, come stai?").inResponseTo(p1));
+        microblog.like(p1, userCharlie);
+        microblog.like(p2, userCharlie);
+        microblog.dislike(p2, userCharlie);
+        microblog.like(p2, userCharlie);
+        microblog.like(p3, userBob);
+        microblog.like(p3, userAlice);
+        System.out.println(SocialNetwork.guessFollowers(microblog.getPosts()));
+        System.out.println(microblog.getFollowers());
+        return SocialNetwork.guessFollowers(microblog.getPosts()) == microblog.getFollowers();
+    }
+
     public static void run() {
         UnitTest.runAndPrint("TestSocialNework.testWrittenBy", TestSocialNetwork.testWrittenBy());
         UnitTest.runAndPrint("TestSocialNework.testInfluencers", TestSocialNetwork.testInfluencers());
+        UnitTest.runAndPrint("TestSocialNework.testGetters", TestSocialNetwork.testGetters());
+        UnitTest.runAndPrint("TestSocialNework.testGuessFollowers", TestSocialNetwork.testGuessFollowers());
     }
 
     private static SocialNetwork socialNetworkWithUsers() {

@@ -1,49 +1,65 @@
-# Primo Progetto Intermedio
+---
+title: Primo Progetto Intermedio
+author: Filippo Costa
+date: Novembre 2020
+---
 
-## 1. Introduzione e generalità
+# 1. Introduzione e generalità
 
-Questa relazione descrive le scelte progettuali del progetto.
+La struttura del progetto (*directory layout*) segue le convenzioni classiche dello strumento Maven, ovvero il *build tool* più usato nell'industria per i progetti Java. Strumenti quali Maven non sono necessari per un progetto dalle dimensioni ridotte quali *MicroBlog*, ma permettono di compilare velocemente l'intero progetto usando ambienti di sviluppo integrato. In alternativa a Maven si può compilare da linea da comando i file sorgente che si trovano nella cartella `mavenless`:
 
-## 1.1 Struttura del progetto
+```
+$ javac -d . *
+$ java net.filippocosta.microblog.Main
+```
 
-La struttura del progetto (*directory layout*) segue le convenzioni classiche dello strumento Maven. Maven è un programma da linea di comando che gestisce in modo complementamente automatico alcuni aspetti:
+Il pacchetto –denominato `net.filippocosta.microblog` in accordo con le direttive ufficiali [Oracle](https://docs.oracle.com/javase/tutorial/java/package/namingpkgs.html)– contiene numerose classi che concorrono alla realizzazione del progetto e alla batteria di test. Le tre parti del progetto sono implementate rispettivamente nei file `Post.java`, `SocialNetwork.java` e `SocialNetworkWithReports.java`. Il sistema rispetta rigorosamente tutte le specifiche date e si discosta solo in funzionalità aggiuntive o quando l'interpretazione di una meccanica è lasciata al progettista.
 
-- Download di librerie e pacchetti esterni.
-- Esecuzione di test.
-- Compilazione.
+# 2. Come funziona MicroBlog
 
-Maven è il *build tool* più usato nell'industria per i progetti Java. La scelta di impostare il progetto seguendo le convenzioni Maven nasce con la speranza che i professori possano sentirsi a loro agio trovando una struttura di progetto familiare e già nota.
+MicroBlog è un componente software scritto in Java dedito alla gestione e all'analisi di un social network. Gli utenti iscritti a MicroBlog possono pubblicare contenuti sotto forma di *post* e interagirci in due modi:
 
-## 1.2 Nome del pacchetto Java
+1. Mettere *like* ai post. I like sono manifestazioni di supporto o di approvazione a un post da parte di utenti terzi. Un utente non può mettere like a un proprio post.
+2. Rispondere ai post. Al momento di pubblicazione di un post, infatti, è possibile selezionare un post preesistente a cui rispondere. Un utente può anche rispondere a se stesso.
 
-L'intero progetto è organizzato in un unico pacchetto Java denominato `net.filippocosta.microblog`. Ho deciso di adottare le direttive ufficiali [Oracle](https://docs.oracle.com/javase/tutorial/java/package/namingpkgs.html), che suggeriscono di utilizzare il nome di domini in proprio possesso per evitare collisioni di nomi, solamente al contrario. `filippocosta.net` è il mio dominio Internet personale.
+I post non sono editabili ma gli autori rispettivi possono eliminarli in qualsiasi momento. Se un post viene eliminato, anche i like e le risposte al post vengono eliminati immediatamente.
 
-## 1.3 Interpretazione delle specifiche originali
+Il contenuto dei post è prettamente testuale, senza la possibilità di allegare immagini o video. Esistono però due forme di contenuti infra-testuali: gli *hashtag* e i *tag*.
 
-Il documento originale di specifica del programma è volutamente scarno e poco dettagliato. Si impongono alcuni vincoli sull'implementazione del sistema su certi aspetti ma la maggior parte delle decisioni vengono lasciate dallo studente, tanto per cui nemmeno il funzionamento base delle funzionalità previste da MicroBlog sono chiare. Mi sono confrontato con diversi studenti -sia del Corso A che del Corso B- circa l'interpretazione del testo e gli approcci possibili sono davvero tanti. In particolare, diverse questioni non sono chiarissime:
-
-- Utilizzo o meno di interfacce per le classi `Post` e `SocialNetwork`.
-- Meccanismi di "following", "menzioni", e "like".
-- Invarianti previste dai metodi assegnati.
-
-Alcuni dubbi sono stati risolti con delle domande opportune a lezione -spesso rivolte sia alla prof.ssa Levi che al prof. Ferrari, ottenendo riscontri diversi- ma mi sono preso la libertà di implementare come ho meglio ritenuto i dettagli non previsti dalle implementazioni. Queste decisioni sono accompagnate da spiegazioni esaustive sia nel presente documento che nel codice sotto forma di commenti, ma rimango disponibile per chiarimenti su ogni aspetto del programma durante l'orale.
+- Gli *hashtag* sono parole o concatenazioni di parole precedute da un cancelletto (`#`). L'uso di un particolare hashtag permette di mettere in evidenza il post se l'hashtag è virale e di facilitare il suggerimento di contenuti simili tramite un'operazione di *keyword matching*.
+- I *tag* sono la menzione esplicita di un nome utente preceduto dalla chiocciola (`@`). Taggando un utente lo si autorizza a scrivere una risposta al post secondo le modalità descritto nel paragrafo 2.2.
 
 ## 2.1 Gli utenti
 
-Gli utenti iscritti al sistema sono idenficati univocamente tramite *username* unico. Prendendo ispirazione da molti social network esistenti ho deciso di limitare la scelta di username a combinazioni di caratteri alfanumerici con underscore di lunghezza 3-12 caratteri.
+Gli utenti iscritti al sistema sono idenficati tramite *username* unico. Prendendo ispirazione da molti social network esistenti ho deciso di limitare la scelta di username a combinazioni di lunghezza 3-12 caratteri di caratteri alfanumerici con underscore (`_`). Ognuna di queste limitazioni è giustificata ampiamente nel codice relativo alla classe `User`. Si sottolinea che, una volta iscritti al sistema, gli utenti non sono sottoposti ad autenticazione tramite password o meccanismi di sessione. È palese che un vero social network avrebbe bisogno di queste funzionalità, ma su MicroBlog non sono necessarie.
 
-La scelta architetturale di scrivere una classe `User` apposta per gestire gli utenti sarebbe valida. Purtroppo il documento di specifica richiede esplicitamente l'utilizzo di `String`.
+## 2.2 Il meccanismo di risposta ai post
 
-## 2.2 I post
+Di default il sistema autorizza chiunque a rispondere a un post, ma questa impostazione è modificabile al momento di creazione di un post (come documentato dalla classe `Post.Builder`). In tal modo si va a limitare il numero di utenti che sono autorizzati a rispondere al post:
 
-Ogni utente iscritto a MicroBlog può pubblicare dei contenuti sotto forma di post (classe `Post`). La visibilità di un post può essere modificata durante la creazione dello stesso, limitando perciò il numero di persone che potranno visualizzarlo e interagirci. Esistono tre (3) impostazioni di visibilità:
+- Autorizzazione pubblica (predefinito). Chiunque può rispondere al post.
+- Autorizzazione riservata. Solo l'autore del post e gli utenti taggati nel post possono rispondervi.
+- Nessuna autorizzazione. Soltanto l'autore del post può rispondervi.
 
-- Segreto. Il post è accessibile solo all'autore stesso. I post segreti sono utili come note personali e promemoria.
-- Protetto. Il post è accessibile solo alle conoscenze ristrette.
-- Pubblico (predefinito). Il post è accessibile a tutti.
+## 2.3 *followers* e *followees*
 
-I post sono identificati da un `java.util.UUID`. Le UUID (Unique Uniform IDentifiers) sono valide alternative alle ID autogenerate incrementalmente e estinguono il rischio di collisione aumentando di molto lo spazio (128 bits contro 32 bits). Ho deciso di adottare le UUID per semplificare la logica del costruttore `Post`.
+È possibile *seguire* un utente mettendo like al suo post di presentazione, ovvero il primo post pubblicato in assoluto sulla piattaforma. (Chiaramente non è possibile seguire un utente senza post.) In maniera analoga, togliendo il like al post di presentazione si smette di seguire l'autore di tale post. In caso di eliminazione di un post il secondo post diviene quello di presentazione e così via.
 
-## 2.3 Seguire un utente
+Più formalmente, seguire un utente significa stabilire una relazione binaria unidirezioinale. La rete di connessioni crea in tal modo un grafo orientato in cui ciascun nodo rappresenta un utente.
 
-In quanto social network, MicroBlog permette dei meccanismi di interazione tra gli utenti iscritti al sistema. Il modo principale per interagire con un utente è quello di *seguirlo*. Seguire un utente non è un meccanismo simmetrico: infatti è possibile seguire un utente senza che questo segua a sua volta. In astratto, possiamo modellare le interazioni sociali su MicroBlog con un grafo orientato.
+> `u1` è un *follower* di `u2` se e solo se `u1` segue `u2`. L'arco esce da `u1` ed entra in `u2`.
+> `u1` è un *followee* di `u2` se e solo se `u2` segue `u1` (relazione inversa, simile al concetto di *employer* e *employee*). L'arco esce da `u2` ed entra in `u1`.
+
+## 3. Scelte di implementazione
+
+## 4. Estendere MicroBlog: parte III del progetto
+
+Per la terza parte del progetto ho implementato `SocialNetworkWithReports`, sottotipo di `SocialNetwork`. La nuova classe permette agli utenti di segnalare come spam o offensivi i contenuti di un post e tiene traccia del numero di segnalazioni per post. Oltre a un certo numero di segnalazioni, i post sono considerati *blacklisted* e l'utilizzatore finale della classe può prendere provvedimenti, per esempio riducendo la visibilità del post od oscurandolo. Di seguito si presentano altre due possibili estensioni gerarchiche della classe `SocialNetwork`.
+
+- `ModeratedSocialNetwork`, che garantisce ad alcuni utenti lo status di admin e permette loro di rimuovere manualmente qualsiasi post, anche non loro. Lo status di admin può (per ovvi motivi di sicurezza) essere garantito solo dal *superuser*, che è unico e va creato assieme al social network nel costruttore.
+- `AutoModeratedSocialNetwork` aggiunge una serie di controlli al momento di pubblicazione dei post e blocca la pubblicazione dei post che non superano certi criteri:
+  - Solleva un'eccezione `ProfanityDetectedException` se il post contiene termini offensivi o dispregiativi.
+  - Solleva un'eccezione `MaliciousLinkException` se il post contiene link a siti di spam, porno o di pirateria.
+  - Solleva un'eccezione `SpamHashtagsException` se il post contiene più hashtags che testo.
+
+Sia `ModeratedSocialNework` che `SocialNetworkWithReports` vanno a modificare il tipo di dato astratto associato alla classe (TDA) e di conseguenza anche la riformulazione di *AF* e *RI*. `AutoModeratedSocialNetwork` invece non richiede una modifica al TDA ma ha semplicemente impone una RI più forte (ovvero l'assenza di post che contengono certi tipi di contenuti).

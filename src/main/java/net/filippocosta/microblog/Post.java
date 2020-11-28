@@ -23,10 +23,10 @@ import java.util.regex.Pattern;
 //        `forall l1, l2. likes ==> l1 != l2`.
 //     6. Il post a cui questo post risponde (opzionale).
 //     7. L'insieme di risposte a questo post:
-//        `{ reply_0, reply_1, ... reply_m }`. Si ha inoltre che
-//        `forall r1, r2. replies ==> r1.id != r2.id`.
+//        `{ replies_0, replies_1, ... replies_m }`. Si ha inoltre che
+//        `forall r1, r2. r1, r2 ∈ replies ==> r1.getId() != r2.getId()`.
 //     8. Un'impostazione che determina chi può rispondere a questo post su
-//        MicroBlog tale per cui `replyRestriction in S`, dove S è il tipo di dato
+//        MicroBlog tale per cui `replyRestriction ∈ S`, dove S è il tipo di dato
 //        astratto della classe `ReplyRestriction`.
 class Post implements CheckRep {
     // AF(p):
@@ -82,7 +82,7 @@ class Post implements CheckRep {
     public static int MAX_LENGTH = 140;
 
     // Attributi imposti dalla specifica del progetto:
-    private final int id;
+    private int id;
     private final String author;
     private final String text;
     private final Instant timestamp;
@@ -426,6 +426,8 @@ class Post implements CheckRep {
     //         > Ma dai! Il corso di danza latino-americana di cui mi parlavi al telefono?
     //            > Esatto :D
     public int totalReplies() {
+        // Potrei usare una funziona ricorsiva ma utilizziamo una DFS (Depth
+        // First Search) fer migliorare le prestazioni.
         Queue<Post> queue = new LinkedList<Post>();
         queue.add(this);
         int size = 0;
@@ -438,6 +440,7 @@ class Post implements CheckRep {
                 size++;
             }
         }
+        // `-1` perchè deve escludere il post originale.
         return size - 1;
     }
 
@@ -452,8 +455,10 @@ class Post implements CheckRep {
     // MODIFIES:
     //   `this`.
     // EFFECTS:
-    //   Restituisce `true` se e solo se `username` ha -al momento di uscita dal
-    //   metodo- messo like al post, `false` altrimenti.
+    //   Se
+    //     (forany i. 0 <= i < this.getLikes().size(), String.equals(this.getLikes().get(i), username))
+    //   allora rimuove il like di `username` e restituisce `false`. Altrimenti
+    //   aggiunge un like da parte di `username` e restituisce `true`.
     public boolean toggleLike(String username) throws NullPointerException, IllegalArgumentException {
         if (username == null) {
             throw new NullPointerException();
@@ -481,6 +486,7 @@ class Post implements CheckRep {
             builder = builder.inResponseTo(this.getParent());
         }
         Post copy = builder.build();
+        copy.id = this.id;
         for (String like : this.getLikes()) {
             copy.toggleLike(like);
         }

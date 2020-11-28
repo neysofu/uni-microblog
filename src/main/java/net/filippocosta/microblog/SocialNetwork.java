@@ -69,6 +69,46 @@ class SocialNetwork implements CheckRep {
         return new ArrayList<String>(this.followees.keySet());
     }
 
+    // Restituisce la lista di tutti gli utenti che hanno mai interagito con il
+    // social network. Essere iscritto a MicroBlog non è sufficiente e serve
+    // soddisfare uno dei seguenti requisiti:
+    //   - Mettere like a un post.
+    //   - Scrivere a un post.
+    //   - Venire taggati da un altro utente in un post.
+    //
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce la lista di tutti gli utenti hanno mai interagito con il
+    //   social network.
+    public List<String> getMentionedUsers() {
+        return new ArrayList<String>(SocialNetwork.getMentionedUsers(this.getPosts()));
+    }
+
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce una mappa che associa a ogni utente appartenente al social
+    //   network l'insieme di utenti che lo seguono. Formalmente si tratta di
+    //   tutte le coppie
+    //     <user_i, {u ∈ this.getUsers() | this.firstPostByUser(user_i).getLikes().contains(u)}>
+    public Map<String, Set<String>> getFollowers() {
+        return SocialNetwork.followersToFollowees(this.followees);
+    }
+
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce una mappa che associa a ogni utente appartenente al social
+    //   network l'insieme di utenti che questo segue. Formalmente si tratta di
+    //   tutte le coppie. Formalmente si tratta di tutte le coppie
+    //     <user_i, followees_i>
+    //   tali per cui `followees_i` è l'insieme degli utenti al primo post dei
+    //   quali `user_i` ha messo like.
+    public Map<String, Set<String>> getFollowees() {
+        return this.followees;
+    }
+
     // REQUIRES:
     //   `ps != null && (forall i. 0 <= i < ps.size() ==> ps.get(i) != null)`.
     // THROWS:
@@ -78,7 +118,10 @@ class SocialNetwork implements CheckRep {
     //   Nessuna modifica.
     // EFFECTS:
     //   Restituisce una mappa che associa a ogni utente l'insieme di tutti e soli
-    //   gli utenti che lo seguono. Le relazioni sono estrapolate da `ps`.
+    //   gli utenti che lo seguono. Formalmente si tratta di tutte le coppie
+    //     <user_i, followers_i>
+    //   tali per cui `followers_i` è l'insieme di utenti che hanno messo like al
+    //   primo post di `user_1`.
     public static Map<String, Set<String>> guessFollowers(List<Post> ps) throws NullPointerException {
         if (ps == null) {
             throw new NullPointerException();
@@ -88,25 +131,22 @@ class SocialNetwork implements CheckRep {
             if (post == null) {
                 throw new NullPointerException();
             } else if (!followers.containsKey(post.getAuthor())) {
-                followers.put(post.getAuthor(), new HashSet<String>());
-            }
-            for (String userWhoLiked : post.getLikes()) {
-                if (!followers.containsKey(userWhoLiked)) {
-                    followers.put(userWhoLiked, new HashSet<String>());
-                }
-                followers.get(post.getAuthor()).add(userWhoLiked);
+                followers.put(post.getAuthor(), new HashSet<String>(post.getLikes()));
             }
         }
         return followers;
     }
 
-    // Restituisce una lista con tutti i nomi utente di `followers` che sono
-    // seguiti da più persone di quante non ne seguano.
-    //
     // REQUIRES:
-    //   `followers != null`.
+    //   `followers != null
+    //    && (forall <k, v>. <k, v> ∈ followers
+    //        ==>
+    //        k != null && v != null && (forall f. f ∈ v ==> f != null))`.
     // THROWS:
-    //   `NullPointerException` se e solo se `followers == null`.
+    //   `NullPointerException` se e solo se
+    //   `followers == null
+    //    || (forany <k, v>. <k, v> ∈ followers,
+    //        k == null || v == null || (forany f. f ∈ v, f == null))`.
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
@@ -114,7 +154,7 @@ class SocialNetwork implements CheckRep {
     //   seguiti da meno utenti di quanti non ne seguano.
     public static List<String> influencers(Map<String, Set<String>> followers) throws NullPointerException {
         List<String> influencers = new ArrayList<>();
-        Map<String, Set<String>> followees = SocialNetwork.getFollowees(followers);
+        Map<String, Set<String>> followees = SocialNetwork.followersToFollowees(followers);
         for (String username : followers.keySet()) {
             int numOfFollowers = followers.get(username).size();
             int numOfFollowees = followees.get(username).size();
@@ -160,7 +200,7 @@ class SocialNetwork implements CheckRep {
     //     > Lucia -> [Mario, Emma]
     //     > Emma -> [Mario]
     //     > Federico -> [Mario, Filippo]
-    public static Map<String, Set<String>> getFollowees(Map<String, Set<String>> followers) {
+    public static Map<String, Set<String>> followersToFollowees(Map<String, Set<String>> followers) {
         Map<String, Set<String>> followees = new HashMap<>();
         for (String followee : followers.keySet()) {
             for (String follower : followers.get(followee)) {
@@ -180,38 +220,15 @@ class SocialNetwork implements CheckRep {
     //   - Scrivere a un post.
     //   - Venire taggati da un altro utente in un post.
     //
-    // MODIFIES:
-    //   Nessuna modifica.
-    // EFFECTS:
-    //   Restituisce la lista di tutti gli utenti hanno main interagito con il
-    //   social network.
-    public List<String> getMentionedUsers() {
-        return new ArrayList<String>(SocialNetwork.getMentionedUsers(this.getPosts()));
-    }
-
-    public Map<String, Set<String>> getFollowers() {
-        return this.followees;
-    }
-
-    public Map<String, Set<String>> getFollowees() {
-        return this.followees;
-    }
-
-    // Restituisce la lista di tutti gli utenti che hanno mai interagito con il
-    // social network. Essere iscritto a MicroBlog non è sufficiente e serve
-    // soddisfare uno dei seguenti requisiti:
-    //   - Mettere like a un post.
-    //   - Scrivere a un post.
-    //   - Venire taggati da un altro utente in un post.
-    //
     // REQUIRES:
-    //   `ps != null && (foreach p. ps ==> p != null)`.
+    //   `ps != null && (forall i. 0 <= i < ps.size() ==> ps.get(i) != null)`.
     // THROWS:
-    //   `NullPointerException` se e solo se `ps == null`.
+    //   `NullPointerException` se e solo se
+    //   `ps == null || (forany i. 0 <= i < ps.size() ==> ps.get(i) == null)`.
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
-    //   Restituisce la lista di tutti gli utenti hanno main interagito con il
+    //   Restituisce la lista di tutti gli utenti hanno mai interagito con il
     //   social network.
     public static Set<String> getMentionedUsers(List<Post> ps) {
         Set<String> mentionedUsers = new HashSet<>();
@@ -238,11 +255,12 @@ class SocialNetwork implements CheckRep {
     //   Nessuna modifica.
     // EFFECTS:
     //   Restituisce la lista di tutti i post scritti dall'utente denominato
-    //   `username`.
+    //   `username`. Formalmente:
+    //     {p ∈ this.getPosts() | p.getAuthor() == username}
     public List<Post> writtenBy(String username) throws NullPointerException {
         if (username == null) {
             throw new NullPointerException();
-        } else if (!this.followees.containsKey(username)) {
+        } else if (!this.postsByUser.containsKey(username)) {
             return new ArrayList<Post>();
         } else {
             List<Post> posts = new ArrayList<>();
@@ -265,7 +283,8 @@ class SocialNetwork implements CheckRep {
     //   Nessuna modifica.
     // EFFECTS:
     //   Restituisce la lista di tutti i post scritti dall'utente denominato
-    //   `username`.
+    //   `username`. Formalmente:
+    //     {p ∈ ps | p.getAuthor() == username}
     public static List<Post> writtenBy(List<Post> ps, String username) {
         if (ps == null || username == null) {
             throw new NullPointerException();
@@ -292,7 +311,8 @@ class SocialNetwork implements CheckRep {
     //   Nessuna modifica.
     // EFFECTS:
     //   Restituisce la lista di tutti i post all'interno del social network che
-    //   contengono una o più dei termini di ricerca richiesti.
+    //   contengono una o più dei termini di ricerca richiesti. Formalmente:
+    //     {p ∈ this.getPosts() | (forany i. 0 <= i < words.size() ==> p.getText().contains(i))}
     public List<Post> containing(List<String> words) {
         if (words == null) {
             throw new NullPointerException();
@@ -303,7 +323,7 @@ class SocialNetwork implements CheckRep {
                 if (post == null) {
                     throw new NullPointerException();
                 } else if (post.getText().contains(word)) {
-                    results.add(post);
+                    results.add(post.deepCopy());
                     break;
                 }
             }
