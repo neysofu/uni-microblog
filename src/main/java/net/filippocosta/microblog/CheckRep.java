@@ -12,5 +12,5 @@ interface CheckRep {
     // EFFECTS:
     //   Restituisce `true` se e solo se l'instanza `this` verifica la propria
     //   invariante di rappresentazione, `false` altrimenti.
-    boolean checkRep();
+    public boolean checkRep();
 }

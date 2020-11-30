@@ -369,7 +369,10 @@ class Post implements CheckRep {
     // EFFECTS:
     //   Restituisce `true` se e solo se `user` è autorizzato a postare una
     //   risposta a `this`, `false` altrimenti.
-    public boolean userCanReply(String user) {
+    public boolean userCanReply(String user) throws NullPointerException {
+        if (user == null) {
+            throw new NullPointerException();
+        }
         switch(this.getReplyRestriction()) {
             case EVERYONE:
                 return true;
@@ -392,7 +395,10 @@ class Post implements CheckRep {
     // EFFECTS:
     //   Restituisce `true` se e solo se `username` ha messo like al post, `false`
     //   altrimenti.
-    public boolean isLikedBy(String username) {
+    public boolean isLikedBy(String username) throws NullPointerException {
+        if (username == null) {
+            throw new NullPointerException();
+        }
         return this.likes.contains(username);
     }
 
@@ -429,7 +435,7 @@ class Post implements CheckRep {
     //            > Esatto :D
     public int totalReplies() {
         // Potrei usare una funziona ricorsiva ma utilizziamo una DFS (Depth
-        // First Search) fer migliorare le prestazioni.
+        // First Search) per migliorare le prestazioni.
         Queue<Post> queue = new LinkedList<Post>();
         queue.add(this);
         int size = 0;
@@ -450,15 +456,15 @@ class Post implements CheckRep {
     // altrimenti lo rimuove.
     //
     // REQUIRES:
-    //   `username != null`.
+    //   `username != null && !String.equals(username, this.getAuthor())`.
     // THROWS:
     //   `NullPointerException` se e solo se `username == null`.
-    //   `IllegalArgumentException` se e solo se `username == this.author`.
+    //   `IllegalArgumentException` se e solo se `String.equals(username, this.getAuthor())`.
     // MODIFIES:
     //   `this`.
     // EFFECTS:
     //   Se
-    //     (forany i. 0 <= i < this.getLikes().size(), String.equals(this.getLikes().get(i), username))
+    //     (forany i | 0 <= i < this.getLikes().size(), String.equals(this.getLikes().get(i), username))
     //   allora rimuove il like di `username` e restituisce `false`. Altrimenti
     //   aggiunge un like da parte di `username` e restituisce `true`.
     public boolean toggleLike(String username) throws NullPointerException, IllegalArgumentException {
@@ -516,12 +522,24 @@ class Post implements CheckRep {
                   && this.timestamp != null
                   && this.likes != null
                   && !this.likes.contains(this.author)
-                  && this.replies != null;
+                  && this.replies != null
+                  && this.hashtags != null
+                  && this.taggedUsers != null;
         for (String like : this.likes) {
             ri = ri && (like != null) && User.usernameIsOk(like);
         }
         for (Post reply : this.replies) {
-            ri = ri && (reply != null) && reply.checkRep();
+            ri = ri
+              && (reply != null)
+              && reply.checkRep()
+              && reply.timestamp.isAfter(this.timestamp)
+              && reply.parent.id == this.id;
+        }
+        for (String hashtag : this.hashtags) {
+            ri = ri && (hashtag != null) && this.text.contains(String.format("#%s", hashtag));
+        }
+        for (String taggedUser : this.taggedUsers) {
+            ri = ri && (taggedUser != null) && this.text.contains(String.format("@%s", taggedUser));
         }
         if (this.replyRestriction == ReplyRestriction.ONLY_AUTHOR) {
             ri = ri && this.replies.size() == 0;
@@ -531,6 +549,7 @@ class Post implements CheckRep {
                 ri = ri && ((reply.author == this.author) || taggedUsers.contains(reply.author));
             }
         }
+        
         return ri;
     }
 
