@@ -27,9 +27,10 @@ public class SocialNetworkWithReports extends SocialNetwork {
     //   RI_SocialNetwork(s)
     //   && (forall <k, v> ∈ s.reports
     //       ==>
-    //       (forall r ∈ v ==> s.getUsers().contains(r) && r != k.getAuthor()))
+    //       (forall r ∈ v ==> s.getUsers().contains(r)
+    //                      && r != this.getPostsById().get(k).getAuthor()))
 
-    private Map<Post, Set<String>> reports;
+    private Map<Integer, Set<String>> reports;
 
     // Costruttore per la classe `SocialNeworkWithReports`.
     //
@@ -50,7 +51,7 @@ public class SocialNetworkWithReports extends SocialNetwork {
     //    && username != null
     //    && this.getUsers().contains(username)
     //    && !String.equals(post.getAuthor(), username)
-    //    && this.getPosts().contains(post)`.
+    //    && this.getPostsById().containsKey(post.getId())`.
     // THROWS:
     //   `NullPointerException` se e solo se `post == null || username == null`.
     //   `PostReportException` se e solo se le altre condizioni sopracitate non
@@ -76,26 +77,29 @@ public class SocialNetworkWithReports extends SocialNetwork {
     //   dove `post_1` identifica il parametro `post`. Nessuna operazione viene
     //   effettuata in caso la segnalazione da parte dell'utente sia già presente.
     public void report(Post post, String username) throws NullPointerException, PostReportException {
+        if (post == null || username == null) {
+            throw new NullPointerException();
+        }
         if (!this.getUsers().contains(username)
             || username == post.getAuthor()
-            || this.getPosts().contains(post)) {
+            || !this.getPostsById().containsKey(post.getId())) {
             throw new PostReportException();
         }
-        this.reports.get(post).add(username);
+        this.reports.get(post.getId()).add(username);
     }
 
     @Override
     public Post writePost(Post.Builder builder) throws NullPointerException, IllegalArgumentException {
         Post post = super.writePost(builder);
-        this.reports.put(post, new HashSet<String>());
+        this.reports.put(post.getId(), new HashSet<String>());
         return post;
     }
 
     // REQUIRES:
-    //   `post != null && this.getPosts().contains(post)`.
+    //   `post != null && this.getPostsById().containsKey(post.getId())`.
     // THROWS:
     //   `NullPointerException` se e solo se `post == null`.
-    //   `IllegalArgumentException` se e solo se `!this.getPosts().contains(post)`.
+    //   `IllegalArgumentException` se e solo se `!this.getPostsById().containsKey(post.getId())`.
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
@@ -106,10 +110,10 @@ public class SocialNetworkWithReports extends SocialNetwork {
     public boolean postIsBlacklisted(Post post) throws NullPointerException, IllegalArgumentException {
         if (post == null) {
             throw new NullPointerException();
-        } else if (!this.reports.containsKey(post)) {
+        } else if (!this.reports.containsKey(post.getId())) {
             throw new IllegalArgumentException();
         } else {
-            return this.reports.get(post).size() > java.lang.Math.sqrt(this.getUsers().size());
+            return this.reports.get(post.getId()).size() > java.lang.Math.sqrt(this.getUsers().size());
         }
     }
 

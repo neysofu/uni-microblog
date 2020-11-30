@@ -439,12 +439,13 @@ class SocialNetwork implements CheckRep {
     // REQUIRES:
     //   `post != null
     //    && username != null
-    //    && this.getPosts().contains(post)`.
+    //    && this.getPostsById().containsKey(post.getId())`.
     // MODIFIES:
     //   `this`.
     // THROWS:
     //   `NullPointerException` se e solo se `post == null || username == null`.
-    //   `IllegalArgumentException` se e solo se `!this.getPosts().contains(post)`.
+    //   `IllegalArgumentException` se e solo se
+    //   `!this.getPostsById().containsKey(post.getId())`.
     // EFFECTS:
     //   Aggiunge il like a `post` da parte di `username` e lo aggiunge alla lista
     //   di followers dell'autore se il post è di presentazione. Nessuna
@@ -466,12 +467,13 @@ class SocialNetwork implements CheckRep {
     // REQUIRES:
     //   `post != null
     //    && username != null
-    //    && this.getPosts().contains(post)`.
+    //    && this.getPostsById().containsKey(post.getId())`.
     // MODIFIES:
     //   `this`.
     // THROWS:
     //   `NullPointerException` se e solo se `post == null || username == null`.
-    //   `IllegalArgumentException` se e solo se `!this.getPosts().contains(post)`.
+    //   `IllegalArgumentException` se e solo se
+    //   `!this.getPostsById().contains(post.getId())`.
     // EFFECTS:
     //   Toglie il like a `post` da parte di `username` e lo rimuove alla lista
     //   di followers dell'autore se il post è di presentazione. Nessuna
