@@ -37,32 +37,25 @@ public class TestSocialNetwork {
                        && microblog.getFollowers().size() == 3
                        && microblog.getFollowers().get(userAlice).size() == 0
                        && microblog.getFollowers().get(userBob).size() == 0;
-        System.out.println(success);
         microblog.like(p2, userBob);
         success = success
                && microblog.getFollowees().get(userBob).size() == 0
                && microblog.getFollowers().get(userAlice).size() == 0;
-        System.out.println(success);
         microblog.like(p1, userBob);
-        System.out.println(microblog.getFollowees());
-        System.out.println(microblog.getFollowers());
         success = success
                && microblog.getFollowees().get(userAlice).size() == 0
                && microblog.getFollowers().get(userAlice).size() == 1
                && microblog.getFollowees().get(userBob).size() == 1
                && microblog.getFollowees().get(userBob).contains(userAlice)
                && microblog.getFollowers().get(userBob).size() == 1;
-        System.out.println(success);
         microblog.dislike(p2, userBob);
         success = success
                && microblog.getFollowers().get(userAlice).size() == 1;
-        System.out.println(success);
         microblog.dislike(p1, userBob);
         success = success
                && microblog.getFollowers().get(userAlice).size() == 0
                && microblog.getFollowees().get(userBob).size() == 0
                && microblog.getFollowers().get(userBob).size() == 0;
-        System.out.println(success);
         return success;
     }
 
@@ -77,8 +70,6 @@ public class TestSocialNetwork {
         microblog.like(p2, userCharlie);
         microblog.like(p3, userBob);
         microblog.like(p3, userAlice);
-        System.out.println(SocialNetwork.guessFollowers(microblog.getPosts()));
-        System.out.println(microblog.getFollowers());
         return SocialNetwork.guessFollowers(microblog.getPosts()) == microblog.getFollowers();
     }
 
