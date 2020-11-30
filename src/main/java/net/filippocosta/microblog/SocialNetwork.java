@@ -56,59 +56,35 @@ class SocialNetwork implements CheckRep {
         this.postsById = new HashMap<>();
     }
 
+    // MODIFIES:
+    //   Nessuna modifica.
     // EFFECTS:
     //   Restituisce una lista di tutti i post presenti su MicroBlog. L'ordine non
-    //   è specificato.
+    //   è specificato. Formalmente si ha che
+    //     this_pre := <{user_0, user_1, ... user_n}, {post_0, post_1, ... post_m}>
+    //   e il valore restituito è
+    //     {post_0, post_1, ... post_m}
+
     public List<Post> getPosts() {
         List<Post> posts = new ArrayList<>();
         for (Map.Entry<String, List<Post>> entry : this.postsByUser.entrySet()) {
             for (Post post : entry.getValue()) {
-                posts.add(post);
+                posts.add(post.deepCopy());
             }
         }
         return posts;
     }
 
+    // MODIFIES:
+    //   Nessuna modifica.
     // EFFECTS:
     //   Restituisce una lista di tutti gli utenti registrati a MicroBlog.
-    //   L'ordine non è specificato.
+    //   L'ordine non è specificato. Formalmente si ha che
+    //     this_pre := <{user_0, user_1, ... user_n}, {post_0, post_1, ... post_m}>
+    //   e il valore restituito è
+    //     {user_0, user_1, ... user_n}
     public List<String> getUsers() {
         return new ArrayList<String>(this.followees.keySet());
-    }
-
-    // MODIFIES:
-    //   Nessuna modifica.
-    // EFFECTS:
-    //   Restituisce la lista di tutti gli utenti hanno postato almeno un post su
-    //   MicroBlog:
-    //     {s ∈ this.getUsers() | this.writtenBy(s).size() >= 1}
-    public Set<String> getMentionedUsers() {
-        return SocialNetwork.getMentionedUsers(this.getPosts());
-    }
-
-    // REQUIRES:
-    //   `ps != null && (forall i. 0 <= i < ps.size() ==> ps.get(i) != null)`.
-    // THROWS:
-    //   `NullPointerException` se e solo se
-    //   `ps == null || (forany i. 0 <= i < ps.size() ==> ps.get(i) == null)`.
-    // MODIFIES:
-    //   Nessuna modifica.
-    // EFFECTS:
-    //   Restituisce la lista di tutti gli utenti hanno mai postato almeno un post
-    //   tra quelli presenti nella lista del parametro `ps`. Formalmente:
-    //     {s | (forany p ∈ ps, String.equals(s, p.getAuthor()))
-    public static Set<String> getMentionedUsers(List<Post> ps) {
-        Set<String> mentionedUsers = new HashSet<>();
-        for (Post post : ps) {
-            mentionedUsers.add(post.getAuthor());
-            for (String taggedUser : post.getTaggedUsers()) {
-                mentionedUsers.add(taggedUser);
-            }
-            for (String userWhoLiked : post.getLikes()) {
-                mentionedUsers.add(userWhoLiked);
-            }
-        }
-        return mentionedUsers;
     }
 
     // MODIFIES:
@@ -119,7 +95,7 @@ class SocialNetwork implements CheckRep {
     //   coppie
     //     <user_i, {u ∈ this.getUsers() | this.getPresentationPost(user_i).getLikes().contains(u)}>
     public Map<String, Set<String>> getFollowers() {
-        return SocialNetwork.followersToFollowees(this.followees);
+        return SocialNetwork.reverseFollowRelation(this.followees);
     }
 
     // MODIFIES:
@@ -133,6 +109,35 @@ class SocialNetwork implements CheckRep {
     //   presentazione dei quali `user_i` ha messo like.
     public Map<String, Set<String>> getFollowees() {
         return this.followees;
+    }
+
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce la lista di tutti gli utenti hanno postato almeno un post su
+    //   MicroBlog:
+    //     {s ∈ this.getUsers() | this.writtenBy(s).size() >= 1}
+    public Set<String> getMentionedUsers() {
+        return SocialNetwork.getMentionedUsers(this.getPosts());
+    }
+
+    // REQUIRES:
+    //   `ps != null && (forall i | 0 <= i < ps.size() ==> ps.get(i) != null)`.
+    // THROWS:
+    //   `NullPointerException` se e solo se
+    //   `ps == null || (forany i | 0 <= i < ps.size(), ps.get(i) == null)`.
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce la lista di tutti gli utenti hanno mai postato almeno un post
+    //   tra quelli presenti nella lista del parametro `ps`. Formalmente:
+    //     {s | (forany p ∈ ps, String.equals(s, p.getAuthor()))
+    public static Set<String> getMentionedUsers(List<Post> ps) throws NullPointerException {
+        Set<String> mentionedUsers = new HashSet<>();
+        for (Post post : ps) {
+            mentionedUsers.add(post.getAuthor());
+        }
+        return mentionedUsers;
     }
 
     // REQUIRES:
@@ -156,6 +161,8 @@ class SocialNetwork implements CheckRep {
         for (Post post : ps) {
             if (post == null) {
                 throw new NullPointerException();
+            // Se non esistono ancora `followers` associati, vuol dire che si
+            // tratta del post di presentazione.
             } else if (!followers.containsKey(post.getAuthor())) {
                 followers.put(post.getAuthor(), new HashSet<String>(post.getLikes()));
             }
@@ -181,7 +188,7 @@ class SocialNetwork implements CheckRep {
     //   seguiti da meno utenti di quanti non ne seguano.
     public static List<String> influencers(Map<String, Set<String>> followers) throws NullPointerException {
         List<String> influencers = new ArrayList<>();
-        Map<String, Set<String>> followees = SocialNetwork.followersToFollowees(followers);
+        Map<String, Set<String>> followees = SocialNetwork.reverseFollowRelation(followers);
         for (String username : followers.keySet()) {
             int numOfFollowers = followers.get(username).size();
             int numOfFollowees = followees.get(username).size();
@@ -206,7 +213,8 @@ class SocialNetwork implements CheckRep {
     //        ==>
     //       (v != null && (forall s ∈ v ==> s != null)))`.
     // THROWS:
-    //   `NullPointerException` se e solo se `followers == null`.
+    //   `NullPointerException` se e solo se `followers == null` o se `followers`
+    //   contiene valori `null`.
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
@@ -227,7 +235,7 @@ class SocialNetwork implements CheckRep {
     //     > Lucia -> [Mario, Emma]
     //     > Emma -> [Mario]
     //     > Federico -> [Mario, Filippo]
-    public static Map<String, Set<String>> followersToFollowees(Map<String, Set<String>> followers) {
+    public static Map<String, Set<String>> reverseFollowRelation(Map<String, Set<String>> followers) {
         Map<String, Set<String>> followees = new HashMap<>();
         for (String followee : followers.keySet()) {
             for (String follower : followers.get(followee)) {
@@ -252,7 +260,7 @@ class SocialNetwork implements CheckRep {
     // EFFECTS:
     //   Restituisce la lista di tutti i post scritti dall'utente denominato
     //   `username`. Formalmente:
-    //     {p ∈ this.getPosts() | p.getAuthor() == username}
+    //     {p ∈ this.getPosts() | String.equalst(p.getAuthor(), username)}
     public List<Post> writtenBy(String username) throws NullPointerException {
         if (username == null) {
             throw new NullPointerException();
@@ -281,7 +289,7 @@ class SocialNetwork implements CheckRep {
     //   Restituisce la lista di tutti i post di `ps`. scritti dall'utente denominato
     //   `username`. Formalmente:
     //     {p ∈ ps | p.getAuthor() == username}
-    public static List<Post> writtenBy(List<Post> ps, String username) {
+    public static List<Post> writtenBy(List<Post> ps, String username) throws NullPointerException {
         if (ps == null || username == null) {
             throw new NullPointerException();
         }
@@ -302,14 +310,15 @@ class SocialNetwork implements CheckRep {
     // REQUIRES:
     //   `words != null && (forall w ∈ words ==> w != null)`.
     // THROWS:
-    //   `NullPointerException` se e solo se `words == null || (forany w. words: w == null)`.
+    //   `NullPointerException` se e solo se
+    //   `words == null || (forany i | 0 <= i < words.size(), w == null)`.
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
     //   Restituisce la lista di tutti i post all'interno del social network che
     //   contengono una o più dei termini di ricerca richiesti. Formalmente:
-    //     {p ∈ this.getPosts() | (forany i | 0 <= i < words.size() ==> p.getText().contains(i))}
-    public List<Post> containing(List<String> words) {
+    //     {p ∈ this.getPosts() | (forany i | 0 <= i < words.size(), p.getText().contains(i))}
+    public List<Post> containing(List<String> words) throws NullPointerException {
         if (words == null) {
             throw new NullPointerException();
         }
@@ -337,7 +346,8 @@ class SocialNetwork implements CheckRep {
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
-    //   Restituisce `true` se e solo se `this.getUsers().contains(username)`, `false` altrimenti.
+    //   Restituisce `true` se e solo se `this.getUsers().contains(username)`,
+    //   `false` altrimenti.
     public boolean userExists(String username) {
         return this.followees.containsKey(username);
     }
@@ -359,7 +369,7 @@ class SocialNetwork implements CheckRep {
     // EFFECTS:
     //   Aggiunge `username` al registro interno degli utenti di MicroBlog e
     //   restituisce il nome utente invariato `username`.
-    public String register(String username) {
+    public String register(String username) throws NullPointerException, IllegalArgumentException {
         if (this.userExists(username)) {
             throw new IllegalArgumentException();
         }
@@ -368,18 +378,27 @@ class SocialNetwork implements CheckRep {
         return username;
     }
 
-    // Pubblica un post sul social network.
+    // Pubblica un post sul social network. Dato `builder` il parametro in
+    // ingresso, il post risultante sarà noto come `post` nella seguente
+    // specifica.
     //
     // REQUIRES:
     //   `post != null &&
-    //    && (post.getParent() != null ==> this.getPosts().contains(post.getParent())
-    //    && (post.getReplies().size() == 0`.
+    //    && (post.getParent() != null ==> this.getPosts().contains(post.getParent());
     // THROWS:
     //   `NullPointerException` se e solo se `post == null`.
+    //   `IllegalArgumentException` se e solo se
+    //   `post.getParent() != null && this.getPosts().contains(post.getParent())`.
     // MODIFIES:
     //   `this`.
     // EFFECTS:
-    //   Restituisce ...
+    //   Restituisce una copia del post creato su MicroBlog. Inoltre, formalmente,
+    //   si ha che se
+    //     this_pre := <{user_0, user_1, ... user_n}, {post_0, post_1, ... post_m}>
+    //   allora
+    //     this_post := <{user_0, user_1, ... user_n}, {post_0, post_1, ... post_m, post_m+1}>
+    //   e il valore restituito è
+    //     <post_m+1>
     public Post writePost(Post.Builder builder) throws NullPointerException, IllegalArgumentException {
         if (builder == null) {
             throw new NullPointerException();
@@ -389,23 +408,27 @@ class SocialNetwork implements CheckRep {
         if (!this.userExists(author)) {
             throw new IllegalArgumentException();
         }
+        if (post.getParent() != null && this.getPosts().contains(post.getParent())) {
+            throw new IllegalArgumentException();
+        }
         this.postsByUser.get(author).add(post);
         this.postsById.put(post.getId(), post);
         return post.deepCopy();
     }
 
-    public void deletePost(Post post) {
-        if (post == null) {
-            throw new NullPointerException();
-        }
-        this.postsById.remove(post.getId());
-        this.postsByUser.get(post.getAuthor()).remove(post);
-    }
-
     // REQUIRES:
     //   `post != null
     //    && username != null
-    //    && 
+    //    && this.getPosts().contains(post)`.
+    // MODIFIES:
+    //   `this`.
+    // THROWS:
+    //   `NullPointerException` se e solo se `post == null || username == null`.
+    //   `IllegalArgumentException` se e solo se `!this.getPosts().contains(post)`.
+    // EFFECTS:
+    //   Aggiunge il like a `post` da parte di `username` e lo aggiunge alla lista
+    //   di followers dell'autore se il post è di presentazione. Nessuna
+    //   operazione viene effettuata se l'utente ha già messo like al post.
     public void like(Post post, String username) throws NullPointerException, IllegalArgumentException {
         if (post == null || username == null) {
             throw new NullPointerException();
@@ -413,13 +436,26 @@ class SocialNetwork implements CheckRep {
         Post internalPost = this.postsById.get(post.getId());
         if (!internalPost.isLikedBy(username)) {
             internalPost.toggleLike(username);
-        }
-        Post firstPost = this.getPresentationPost(post.getAuthor());
-        if (firstPost.getId() == post.getId()) {
-            this.followees.get(username).add(post.getAuthor());
+            Post firstPost = this.getPresentationPost(post.getAuthor());
+            if (firstPost.getId() == post.getId()) {
+                this.followees.get(username).add(post.getAuthor());
+            }
         }
     }
 
+    // REQUIRES:
+    //   `post != null
+    //    && username != null
+    //    && this.getPosts().contains(post)`.
+    // MODIFIES:
+    //   `this`.
+    // THROWS:
+    //   `NullPointerException` se e solo se `post == null || username == null`.
+    //   `IllegalArgumentException` se e solo se `!this.getPosts().contains(post)`.
+    // EFFECTS:
+    //   Toglie il like a `post` da parte di `username` e lo rimuove alla lista
+    //   di followers dell'autore se il post è di presentazione. Nessuna
+    //   operazione viene effettuata se l'utente non ha già messo like al post.
     public void dislike(Post post, String username) throws NullPointerException, IllegalArgumentException {
         if (post == null || username == null) {
             throw new NullPointerException();
@@ -434,6 +470,16 @@ class SocialNetwork implements CheckRep {
         }
     }
 
+    // REQUIRES:
+    //   `username != null && this.writtenBy(username).size() != 0`.
+    // THROWS:
+    //   `NullPointerException` se e solo se `username == null`.
+    //   `IllegalArgumentException` se e solo se l'utente non ha ancora pubblicato
+    //   alcun post di presentazione.
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
+    //   Restituisce una copia del post di presentazione scritto da `username`.
     public Post getPresentationPost(String username) throws NullPointerException, IllegalArgumentException {
         if (username == null) {
             throw new NullPointerException();
