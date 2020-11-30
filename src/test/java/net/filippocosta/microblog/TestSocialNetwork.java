@@ -1,6 +1,9 @@
 package net.filippocosta.microblog;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 public class TestSocialNetwork {
     static String userAlice = "Alice";
@@ -17,8 +20,8 @@ public class TestSocialNetwork {
             && microblog.writtenBy(userAlice).size() == 1
             && microblog.writtenBy(userBob).size() == 3
             && microblog.writtenBy(userCharlie).size() == 0
-            && microblog.getPosts().contains(post)
-            && microblog.getPosts().size() == 3
+            && microblog.getPostsById().containsKey(post.getId())
+            && microblog.getPosts().size() == 4
             && microblog.containing(Arrays.asList("Striscia", "Notizia", "Harry")).size() == 3;
     }
 
@@ -47,7 +50,7 @@ public class TestSocialNetwork {
                && microblog.getFollowers().get(userAlice).size() == 1
                && microblog.getFollowees().get(userBob).size() == 1
                && microblog.getFollowees().get(userBob).contains(userAlice)
-               && microblog.getFollowers().get(userBob).size() == 1;
+               && microblog.getFollowers().get(userBob).size() == 0;
         microblog.dislike(p2, userBob);
         success = success
                && microblog.getFollowers().get(userAlice).size() == 1;
@@ -70,7 +73,8 @@ public class TestSocialNetwork {
         microblog.like(p2, userCharlie);
         microblog.like(p3, userBob);
         microblog.like(p3, userAlice);
-        return SocialNetwork.guessFollowers(microblog.getPosts()) == microblog.getFollowers();
+        return dropEmptyEntries(microblog.getFollowers())
+            .equals(SocialNetwork.guessFollowers(microblog.getPosts()));
     }
 
     public static void run() {
@@ -86,5 +90,15 @@ public class TestSocialNetwork {
         microblog.register(userBob);
         microblog.register(userCharlie);
         return microblog;
+    }
+
+    private static Map<String, Set<String>> dropEmptyEntries(Map<String, Set<String>> map) {
+        Map<String, Set<String>> filtered = new HashMap<>();
+        for (Map.Entry<String, Set<String>> entry : map.entrySet()) {
+            if (entry.getValue().size() != 0) {
+                filtered.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return filtered;
     }
 }

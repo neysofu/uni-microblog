@@ -9,5 +9,7 @@ public class Main {
         TestPost.run();
         System.out.println("");
         TestSocialNetwork.run();
+        System.out.println("");
+        TestSocialNetworkWithReports.run();
     }
 }

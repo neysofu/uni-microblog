@@ -78,6 +78,23 @@ class SocialNetwork implements CheckRep {
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
+    //   Restituisce una mappa che associa a tutti gli utenti di MicroBlog gli
+    //   ordini che ciascuno ha scritto. L'ordine non
+    //   è specificato. Formalmente si ha che
+    //     this_pre := <{user_0, user_1, ... user_n}, {post_0, post_1, ... post_m}>
+    //   e il valore restituito è
+    //     {<user_0, posts_0>, <user_1, posts_1>, ... <user_n, posts_n>}
+    public Map<Integer, Post> getPostsById() {
+        Map<Integer, Post> posts = new HashMap<>();
+        for (Map.Entry<Integer, Post> entry : this.postsById.entrySet()) {
+            posts.put(entry.getKey(), entry.getValue().deepCopy());
+        }
+        return posts;
+    }
+
+    // MODIFIES:
+    //   Nessuna modifica.
+    // EFFECTS:
     //   Restituisce una lista di tutti gli utenti registrati a MicroBlog.
     //   L'ordine non è specificato. Formalmente si ha che
     //     this_pre := <{user_0, user_1, ... user_n}, {post_0, post_1, ... post_m}>
@@ -141,10 +158,10 @@ class SocialNetwork implements CheckRep {
     }
 
     // REQUIRES:
-    //   `ps != null && (forall i ∈ 0 <= i < ps.size() ==> ps.get(i) != null)`.
+    //   `ps != null && (forall i | 0 <= i < ps.size() ==> ps.get(i) != null)`.
     // THROWS:
     //   `NullPointerException` se e solo se
-    //   `ps == null || (forany i ∈ 0 <= i < ps.size(), ps.get(i) == null)`.
+    //   `ps == null || (forany i | 0 <= i < ps.size(), ps.get(i) == null)`.
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
@@ -238,8 +255,11 @@ class SocialNetwork implements CheckRep {
     public static Map<String, Set<String>> reverseFollowRelation(Map<String, Set<String>> followers) {
         Map<String, Set<String>> followees = new HashMap<>();
         for (String followee : followers.keySet()) {
+            if (!followees.containsKey(followee)) {
+                followees.put(followee, new HashSet<String>());
+            }
             for (String follower : followers.get(followee)) {
-                if (!followees.containsKey(followee)) {
+                if (!followees.containsKey(follower)) {
                     followees.put(follower, new HashSet<String>());
                 }
                 followees.get(follower).add(followee);
