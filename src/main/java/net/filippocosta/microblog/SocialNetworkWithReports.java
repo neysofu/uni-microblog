@@ -10,18 +10,24 @@ import java.util.Set;
 // OVERVIEW:
 //   Questa sottoclasse di `SocialNetwork` aggiunge un'informazione (`reports`) al
 //   tipo di dato astratto. L'elemento tipico diventa perciò diventa da
-//     <{post_0, post_1, ... post_n}>
+//     <{user_0, user_1, ... user_n}, {post_0, post_1, ... post_m}>
 //   a
-//     <{<post_0, {segnalazione_0, ... segnalazione_m0}>,
-//       <post_1, {segnalazione_0, ... segnalazione_m1}>}>
+//     <{user_0, user_1, ... user_n},
+//      {<post_0, {segnalazione_0, ... segnalazione_m0}>,
+//       <post_1, {segnalazione_0, ... segnalazione_m1}>,
+//       ...
+//       <post_m, {segnalazione_0, ... segnalazione_mk}>}>
+//
 //   Ciò significa che a ogni post si aggiunge un insieme di segnalazioni da parte
 //   di altri utenti.
 public class SocialNetworkWithReports extends SocialNetwork {
     // AF(s):
-    //
+    //   <c.followes.keySet(), c.reports>
     // RI(s):
     //   RI_SocialNetwork(s)
-    //   &&
+    //   && (forall <k, v> ∈ s.reports
+    //       ==>
+    //       (forall r ∈ v ==> s.getUsers().contains(r) && r != k.getAuthor()))
 
     private Map<Post, Set<String>> reports;
 
@@ -37,16 +43,18 @@ public class SocialNetworkWithReports extends SocialNetwork {
         this.reports = new HashMap<>();
     }
 
-    // Segnala un post.
+    // Segnala un post. Si noti che la segnalazione è irreversibile.
     //
     // REQUIRES:
     //   `post != null
     //    && username != null
     //    && this.getUsers().contains(username)
+    //    && !String.equals(post.getAuthor(), username)
     //    && this.getPosts().contains(post)`.
     // THROWS:
     //   `NullPointerException` se e solo se `post == null || username == null`.
-    //   `IllegalArgumentException` se e solo se `TODO`.
+    //   `PostReportException` se e solo se le altre condizioni sopracitate non
+    //   sono rispettate.
     // MODIFIES:
     //   `this`.
     // EFFECTS:
@@ -67,12 +75,17 @@ public class SocialNetworkWithReports extends SocialNetwork {
     //                   <post_n, {segnalazione_0, ... segnalazione_mn}>}>
     //   dove `post_1` identifica il parametro `post`. Nessuna operazione viene
     //   effettuata in caso la segnalazione da parte dell'utente sia già presente.
-    public void report(Post post, String username) {
+    public void report(Post post, String username) throws NullPointerException, PostReportException {
+        if (!this.getUsers().contains(username)
+            || username == post.getAuthor()
+            || this.getPosts().contains(post)) {
+            throw new PostReportException();
+        }
         this.reports.get(post).add(username);
     }
 
     @Override
-    public Post writePost(Post.Builder builder) {
+    public Post writePost(Post.Builder builder) throws NullPointerException, IllegalArgumentException {
         Post post = super.writePost(builder);
         this.reports.put(post, new HashSet<String>());
         return post;
@@ -82,6 +95,7 @@ public class SocialNetworkWithReports extends SocialNetwork {
     //   `post != null && this.getPosts().contains(post)`.
     // THROWS:
     //   `NullPointerException` se e solo se `post == null`.
+    //   `IllegalArgumentException` se e solo se `!this.getPosts().contains(post)`.
     // MODIFIES:
     //   Nessuna modifica.
     // EFFECTS:
@@ -89,7 +103,7 @@ public class SocialNetworkWithReports extends SocialNetwork {
     //   segnalazioni, `false` altrimenti. Il numero di segnalazioni da superare
     //   non fa parte della specifica ed è da considerarsi un dettaglio
     //   dell'implementazione.
-    public boolean postIsBlacklisted(Post post) {
+    public boolean postIsBlacklisted(Post post) throws NullPointerException, IllegalArgumentException {
         if (post == null) {
             throw new NullPointerException();
         } else if (!this.reports.containsKey(post)) {
@@ -108,7 +122,7 @@ public class SocialNetworkWithReports extends SocialNetwork {
     //   formalmente, è
     //     val := <{post_0, post_1, ... post_n}>
     //   tale per cui
-    //     (forall i. 0 <= i < this.getPosts().size()
+    //     (forall i | 0 <= i < this.getPosts().size()
     //     ==>
     //     (this.postIsBlacklisted(this.getPosts().get(i))
     //      <==>
